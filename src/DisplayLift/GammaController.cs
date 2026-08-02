@@ -12,11 +12,20 @@ internal sealed class GammaController : IDisposable
         _originalRamp = ReadCurrentRamp();
     }
 
-    public bool TryApply(DisplayPreset preset, out string? error)
+    public bool TryApply(int shadowLiftPercent, out string? error)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        var ramp = BuildRamp(preset);
+        if (shadowLiftPercent is < 0 or > 60)
+        {
+            error = "Shadow lift must be between 0 and 60 percent.";
+            return false;
+        }
+
+        var gamma = 1.0 + (shadowLiftPercent / 100.0);
+        var blackLift = shadowLiftPercent * 0.0008;
+        var gain = 1.0 + (shadowLiftPercent * 0.00025);
+        var ramp = BuildRamp(gamma, blackLift, gain);
         return TrySetRamp(ramp, out error);
     }
 
@@ -48,7 +57,7 @@ internal sealed class GammaController : IDisposable
         _disposed = true;
     }
 
-    private static GammaRamp BuildRamp(DisplayPreset preset)
+    private static GammaRamp BuildRamp(double gamma, double blackLift, double gain)
     {
         var red = new ushort[256];
         var green = new ushort[256];
@@ -57,9 +66,9 @@ internal sealed class GammaController : IDisposable
         for (var i = 0; i < 256; i++)
         {
             var input = i / 255.0;
-            var gammaAdjusted = Math.Pow(input, 1.0 / preset.Gamma);
-            var lifted = preset.BlackLift + ((1.0 - preset.BlackLift) * gammaAdjusted);
-            var output = Math.Clamp(lifted * preset.Gain, 0.0, 1.0);
+            var gammaAdjusted = Math.Pow(input, 1.0 / gamma);
+            var lifted = blackLift + ((1.0 - blackLift) * gammaAdjusted);
+            var output = Math.Clamp(lifted * gain, 0.0, 1.0);
             var value = (ushort)Math.Round(output * ushort.MaxValue);
 
             red[i] = value;
@@ -107,7 +116,7 @@ internal sealed class GammaController : IDisposable
         {
             if (!SetDeviceGammaRamp(deviceContext, ref ramp))
             {
-                error = "The display driver rejected the gamma change. Try borderless mode or update the GPU driver.";
+                error = "The display driver rejected the shadow-lift change. Try borderless-windowed mode or update the GPU driver.";
                 return false;
             }
 

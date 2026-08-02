@@ -20,7 +20,7 @@ jobs:
       - name: Verify repository structure
         shell: pwsh
         run: ./tests/Test-RepositoryState.ps1 -RequireClean
-      - name: Publish single-file executable
+      - name: Test and publish single-file executable
         shell: pwsh
         run: ./scripts/build.ps1
       - name: Verify build output

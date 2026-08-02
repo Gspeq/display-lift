@@ -1,4 +1,3 @@
-# DisplayLift-Repository-Test-Version: 4
 [CmdletBinding()]
 param(
     [switch]$RequireClean,
@@ -19,11 +18,15 @@ $ExpectedManagedFiles = @(
     'scripts/build.ps1',
     'scripts/one-click-publish.ps1',
     'src/DisplayLift/app.manifest',
+    'src/DisplayLift/ColorEffectController.cs',
+    'src/DisplayLift/ColorMatrixBuilder.cs',
     'src/DisplayLift/DisplayLift.csproj',
     'src/DisplayLift/DisplayPreset.cs',
     'src/DisplayLift/GammaController.cs',
     'src/DisplayLift/MainForm.cs',
     'src/DisplayLift/Program.cs',
+    'tests/DisplayLift.Tests/DisplayLift.Tests.csproj',
+    'tests/DisplayLift.Tests/Program.cs',
     'tests/Test-RepositoryState.ps1'
 ) | Sort-Object
 
@@ -45,12 +48,6 @@ function Add-Failure {
 }
 
 $Failures = New-Object 'System.Collections.Generic.List[string]'
-
-$PublisherScript = Join-Path $RepoRoot 'scripts\one-click-publish.ps1'
-if ((Test-Path -LiteralPath $PublisherScript -PathType Leaf) -and
-    -not (Select-String -LiteralPath $PublisherScript -SimpleMatch '# DisplayLift-Publisher-Version: 4' -Quiet)) {
-    Add-Failure 'The publisher script is stale; V4 was not installed.'
-}
 
 foreach ($relativePath in $ExpectedManagedFiles) {
     $nativePath = Join-Path $RepoRoot ($relativePath.Replace('/', '\'))

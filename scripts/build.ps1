@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Project = Join-Path $RepoRoot 'src\DisplayLift\DisplayLift.csproj'
+$TestProject = Join-Path $RepoRoot 'tests\DisplayLift.Tests\DisplayLift.Tests.csproj'
 $Dist = Join-Path $RepoRoot 'dist'
 
 function Refresh-Path {
@@ -38,12 +39,18 @@ function Ensure-DotNet {
 
 Ensure-DotNet
 
+Write-Host 'Running color-matrix tests...'
+dotnet run --project $TestProject --configuration Release
+if ($LASTEXITCODE -ne 0) {
+    throw 'Color-matrix tests failed.'
+}
+
 if (Test-Path $Dist) {
     Remove-Item $Dist -Recurse -Force
 }
 New-Item $Dist -ItemType Directory | Out-Null
 
-Write-Host "Publishing DisplayLift for $Runtime..."
+Write-Host "Publishing DisplayLift Vibrance for $Runtime..."
 dotnet publish $Project `
     --configuration Release `
     --runtime $Runtime `

@@ -1,4 +1,4 @@
-# DisplayLift-Publisher-Version: 4
+# DisplayLift-Publisher-Version: 5
 [CmdletBinding()]
 param(
     [string]$RepoName = 'display-lift',
@@ -114,7 +114,9 @@ try {
     }
 
     git config --local core.autocrlf false
-    Assert-LastExitCode 'Could not configure repository line-ending behavior.'
+    Assert-LastExitCode 'Could not disable automatic line-ending conversion for this repository.'
+    git config --local core.eol lf
+    Assert-LastExitCode 'Could not configure LF repository line endings.'
 
     $NameResult = Invoke-CapturedProcess -FilePath 'git' -ArgumentList @('config', '--local', '--get', 'user.name')
     if ($NameResult.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($NameResult.StdOut)) {
@@ -160,20 +162,18 @@ try {
     $RemoteNames = @($RemoteListResult.StdOut -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 
     $FullRepo = "$Login/$RepoName"
-    $ExpectedHttpsUrl = "https://github.com/$FullRepo.git"
-
     if ('origin' -notin $RemoteNames) {
         $RepoView = Invoke-CapturedProcess -FilePath 'gh' -ArgumentList @('repo', 'view', $FullRepo, '--json', 'nameWithOwner', '--jq', '.nameWithOwner')
         if ($RepoView.ExitCode -ne 0) {
             $VisibilityFlag = "--$Visibility"
-            gh repo create $FullRepo $VisibilityFlag --description 'A small Windows display-gamma preset utility with safe restore controls.'
+            gh repo create $FullRepo $VisibilityFlag --description 'A Windows desktop vibrance utility with saturation, contrast, brightness, shadow lift, and safe restore controls.'
             Assert-LastExitCode 'GitHub repository creation failed.'
         }
         else {
             Write-Host "Using existing GitHub repository $FullRepo."
         }
 
-        git remote add origin $ExpectedHttpsUrl
+        git remote add origin "https://github.com/$FullRepo.git"
         Assert-LastExitCode "Could not add Git remote 'origin'."
     }
 
@@ -182,14 +182,9 @@ try {
         throw "Git remote 'origin' exists but has no usable URL."
     }
     $OriginUrl = $OriginUrlResult.StdOut.Trim()
-    $NormalizedOrigin = $OriginUrl.ToLowerInvariant().TrimEnd('/')
-    $AcceptedOrigins = @(
-        $ExpectedHttpsUrl.ToLowerInvariant().TrimEnd('/'),
-        "git@github.com:${FullRepo}.git".ToLowerInvariant(),
-        "ssh://git@github.com/${FullRepo}.git".ToLowerInvariant().TrimEnd('/')
-    )
-    if ($NormalizedOrigin -notin $AcceptedOrigins) {
-        throw "The existing origin remote points to '$OriginUrl', not '$FullRepo'. It was not changed automatically."
+    $escapedFullRepo = [regex]::Escape($FullRepo)
+    if ($OriginUrl -notmatch "[/:]$escapedFullRepo(?:\.git)?$") {
+        throw "Git remote 'origin' points to an unrelated repository: $OriginUrl. Expected $FullRepo."
     }
     Write-Host "Origin remote: $OriginUrl"
 

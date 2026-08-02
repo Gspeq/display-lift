@@ -2,7 +2,8 @@ namespace DisplayLift;
 
 internal sealed record DisplayPreset(
     string Name,
-    double Gamma,
-    double BlackLift,
-    double Gain,
+    int SaturationPercent,
+    int ContrastPercent,
+    int BrightnessPercent,
+    int ShadowLiftPercent,
     string Description);
