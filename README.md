@@ -1,94 +1,77 @@
-# DisplayLift Vibrance
+# DisplayLift Visual Panel
 
-DisplayLift Vibrance is a small 64-bit Windows utility for making the entire desktop dramatically more colorful. It applies a real full-screen color matrix for saturation, contrast, and brightness, while an independent gamma ramp provides optional shadow lift.
+DisplayLift is an external Windows display-profile manager designed around Rust visibility and fast biome switching. It provides a dark real-time visual panel with saved profiles, automatic process activation, NVIDIA driver vibrance, Windows color/tone controls and one-click Rust presets.
 
-It uses standard Windows display APIs only:
+This is an independent implementation based only on publicly advertised feature descriptions of color-profile utilities. It does not contain proprietary code, assets or branding from another application.
 
-- no game injection or DLL loading into Rust
-- no reading or writing another process
-- no in-game overlay
-- no memory access
-- no automatic game detection
-- no anti-cheat bypass behavior
+## Rust Visual panel
 
-## Controls
+The main panel presents the controls in the same practical order used by dedicated Rust visual utilities:
 
-Four manual settings are available:
+- Saturation
+- Vibrance
+- Brightness
+- Contrast
+- Exposure
+- Gamma / midtones
+- Shadow lift
+- Temperature and tint
+- Red, green and blue channel gain
 
-- **Saturation:** 100–350%
-- **Contrast:** 80–130%
-- **Brightness:** −10% to +20%
-- **Shadow lift:** 0–60%
+The bundled **Clean Rust** preset uses the public demonstration values `1.52` saturation, `+0.80` vibrance, `+0.06` brightness and `1.05` contrast. Additional one-click profiles cover Summer, Winter, Desert, Night, Competitive and Maximum Color.
 
-Included presets:
+## Profiles and automation
 
-1. **Normal** — restore the original display.
-2. **Color Pop** — 180% saturation.
-3. **Extreme** — 260% saturation.
-4. **Nuclear** — 340% saturation with extra contrast.
-5. **Neon Shadows** — 290% saturation with a large dark-area lift.
+- A Rust profile targeting `RustClient.exe` is created automatically.
+- Rust is located across Steam library folders when possible.
+- Add any running program or browse directly to an executable.
+- Activate a profile while its app is foregrounded or for the entire time it is running.
+- Priorities resolve overlapping profiles.
+- Clone, import and export profile JSON files.
+- Restore the original display state after a game closes or loses focus.
+- Minimize to the system tray and optionally start with Windows.
 
-Global hotkeys:
+## Display backends
 
-- `Ctrl + Alt + F9`: cycle presets
-- `Ctrl + Alt + F10`: restore the original display
+- NVIDIA Digital Vibrance through NVAPI when an NVIDIA-driven display is available.
+- Windows full-screen color matrix for saturation, contrast, brightness, exposure, temperature, tint and RGB gain.
+- Windows gamma ramp for gamma and shadow lift.
+- Matrix-based vibrance approximation when driver vibrance is unavailable.
 
-The color effect changes the whole desktop. DisplayLift captures the existing Windows full-screen color matrix and gamma ramp when it starts, then restores both when you press Restore or exit normally.
+Borderless-windowed mode is recommended for the Windows full-screen color matrix. Driver vibrance and gamma support depend on the installed display driver and monitor path.
 
-## One-click build
+## Hotkeys
 
-Double-click:
+- `Ctrl+Alt+F9`: cycle Rust presets
+- `Ctrl+Alt+F10`: restore original display settings
+- `Ctrl+Alt+F11`: resume automatic profile switching
 
-```text
-ONE-CLICK-BUILD.cmd
-```
+## Build and publish
 
-The script installs the .NET 8 SDK through `winget` when necessary, runs the color-matrix tests, and creates:
-
-```text
-dist\DisplayLift.exe
-DisplayLift-win-x64.zip
-DisplayLift-win-x64.zip.sha256
-```
-
-Launch the finished app at:
+Double-click `ONE-CLICK-BUILD.cmd` to run tests and produce:
 
 ```text
 Desktop\DisplayLift\dist\DisplayLift.exe
 ```
 
-## One-click build and GitHub publish
+Double-click `ONE-CLICK-PUBLISH.cmd` to build, initialize or update the local Git repository, create/connect the GitHub remote, push `main`, verify that local and remote commits match, create a Desktop shortcut and launch the app.
 
-Double-click:
+The standalone installer BAT supplied with the release creates or updates the entire `Desktop\DisplayLift` project while preserving `.git` and build output. It replaces managed source directories rather than layering duplicate files.
 
-```text
-ONE-CLICK-PUBLISH.cmd
-```
+## Safety boundary
 
-It builds and tests the utility, initializes or updates the local Git repository, creates or reconnects the `display-lift` GitHub repository, pushes `main`, and verifies that local `HEAD` exactly matches `origin/main`.
+DisplayLift does not:
 
-The repository checks also reject missing managed files, unexpected managed files, common duplicate-copy filenames, byte-for-byte duplicate managed files, case-colliding Git paths, committed build output, dirty local changes, and local/remote commit mismatches.
+- inject DLLs;
+- modify Rust or Easy Anti-Cheat files;
+- read game memory;
+- draw an in-game overlay;
+- automate mouse or keyboard input;
+- alter recoil, aim or game mechanics;
+- attempt to bypass anti-cheat.
 
-## Display behavior
+It watches only process names and changes external display settings. No third-party utility can guarantee that a game publisher will keep the same policy indefinitely, so users should review current Rust and Easy Anti-Cheat rules before use.
 
-Windows applies the color matrix to the desktop through its full-screen Magnification color-effect API. Some exclusive-fullscreen games or GPU-driver color profiles can override desktop transforms. Borderless-windowed mode is the most reliable mode for this type of system-level adjustment.
+## License
 
-## Development
-
-Build manually:
-
-```powershell
-./scripts/build.ps1
-```
-
-Run from source:
-
-```powershell
-dotnet run --project ./src/DisplayLift/DisplayLift.csproj
-```
-
-Run repository verification:
-
-```powershell
-./tests/Test-RepositoryState.ps1 -RequireClean -RequireRemoteSync
-```
+MIT. `NvAPIWrapper.Net` has its own license; see `THIRD-PARTY-NOTICES.md`.

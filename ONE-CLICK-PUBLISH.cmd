@@ -1,7 +1,7 @@
 @echo off
 setlocal
-cd /d "%~dp0"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\one-click-publish.ps1" -RepoName "display-lift" -Visibility "public"
+title DisplayLift V7 Build and Publish
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\one-click-publish.ps1"
 if errorlevel 1 (
   echo.
   echo Publish failed. Review the message above.
@@ -9,5 +9,5 @@ if errorlevel 1 (
   exit /b 1
 )
 echo.
-echo Build and GitHub publish finished successfully.
+echo DisplayLift V7 built, synchronized and launched.
 pause

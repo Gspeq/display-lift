@@ -13,44 +13,38 @@ $Dist = Join-Path $RepoRoot 'dist'
 function Refresh-Path {
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-    $env:Path = "$machinePath;$userPath"
+    $env:Path = "$machinePath;$userPath;C:\Program Files\dotnet"
 }
 
 function Ensure-DotNet {
-    if (Get-Command dotnet -ErrorAction SilentlyContinue) {
-        return
-    }
-
+    if (Get-Command dotnet -ErrorAction SilentlyContinue) { return }
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
         throw '.NET 8 SDK is missing and winget is unavailable. Install the .NET 8 SDK, then run this script again.'
     }
-
     Write-Host 'Installing .NET 8 SDK...'
     winget install --id Microsoft.DotNet.SDK.8 --exact --accept-package-agreements --accept-source-agreements
-    if ($LASTEXITCODE -ne 0) {
-        throw 'The .NET SDK installation failed.'
-    }
-
+    if ($LASTEXITCODE -ne 0) { throw 'The .NET SDK installation failed.' }
     Refresh-Path
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-        $env:Path += ';C:\Program Files\dotnet'
-    }
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { throw '.NET was installed but is not available in PATH yet. Restart Windows and rerun the installer.' }
 }
 
 Ensure-DotNet
 
-Write-Host 'Running color-matrix tests...'
-dotnet run --project $TestProject --configuration Release
-if ($LASTEXITCODE -ne 0) {
-    throw 'Color-matrix tests failed.'
+$Running = @(Get-Process -Name 'DisplayLift' -ErrorAction SilentlyContinue)
+if ($Running.Count -gt 0) {
+    Write-Host 'Closing the previous DisplayLift process for the update...'
+    $Running | Stop-Process -Force
+    Start-Sleep -Milliseconds 500
 }
 
-if (Test-Path $Dist) {
-    Remove-Item $Dist -Recurse -Force
-}
+Write-Host 'Running V7 profile, preset and color-matrix tests...'
+dotnet run --project $TestProject --configuration Release
+if ($LASTEXITCODE -ne 0) { throw 'DisplayLift tests failed.' }
+
+if (Test-Path $Dist) { Remove-Item $Dist -Recurse -Force }
 New-Item $Dist -ItemType Directory | Out-Null
 
-Write-Host "Publishing DisplayLift Vibrance for $Runtime..."
+Write-Host "Publishing DisplayLift V7 for $Runtime..."
 dotnet publish $Project `
     --configuration Release `
     --runtime $Runtime `
@@ -58,27 +52,16 @@ dotnet publish $Project `
     -p:PublishSingleFile=true `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     --output $Dist
-
-if ($LASTEXITCODE -ne 0) {
-    throw 'dotnet publish failed.'
-}
+if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
 
 $Exe = Join-Path $Dist 'DisplayLift.exe'
-if (-not (Test-Path $Exe)) {
-    throw "Build completed without producing $Exe"
-}
-
+if (-not (Test-Path $Exe)) { throw "Build completed without producing $Exe" }
 $BuiltExecutables = @(Get-ChildItem -LiteralPath $Dist -Filter 'DisplayLift*.exe' -File)
-if ($BuiltExecutables.Count -ne 1) {
-    throw "Expected exactly one DisplayLift executable in dist, but found $($BuiltExecutables.Count)."
-}
+if ($BuiltExecutables.Count -ne 1) { throw "Expected exactly one DisplayLift executable in dist, but found $($BuiltExecutables.Count)." }
 
 $Zip = Join-Path $RepoRoot "DisplayLift-$Runtime.zip"
-if (Test-Path $Zip) {
-    Remove-Item $Zip -Force
-}
+if (Test-Path $Zip) { Remove-Item $Zip -Force }
 Compress-Archive -Path (Join-Path $Dist '*') -DestinationPath $Zip -CompressionLevel Optimal
-
 $Hash = (Get-FileHash $Zip -Algorithm SHA256).Hash
 Set-Content -Path "$Zip.sha256" -Value "$Hash  $(Split-Path $Zip -Leaf)" -Encoding ascii
 

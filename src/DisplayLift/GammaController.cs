@@ -12,9 +12,15 @@ internal sealed class GammaController : IDisposable
         _originalRamp = ReadCurrentRamp();
     }
 
-    public bool TryApply(int shadowLiftPercent, out string? error)
+    public bool TryApply(int gammaPercent, int shadowLiftPercent, out string? error)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (gammaPercent is < 60 or > 180)
+        {
+            error = "Gamma must be between 60 and 180 percent.";
+            return false;
+        }
 
         if (shadowLiftPercent is < 0 or > 60)
         {
@@ -22,7 +28,12 @@ internal sealed class GammaController : IDisposable
             return false;
         }
 
-        var gamma = 1.0 + (shadowLiftPercent / 100.0);
+        if (gammaPercent == 100 && shadowLiftPercent == 0)
+        {
+            return TryRestore(out error);
+        }
+
+        var gamma = gammaPercent / 100.0;
         var blackLift = shadowLiftPercent * 0.0008;
         var gain = 1.0 + (shadowLiftPercent * 0.00025);
         var ramp = BuildRamp(gamma, blackLift, gain);
@@ -116,7 +127,7 @@ internal sealed class GammaController : IDisposable
         {
             if (!SetDeviceGammaRamp(deviceContext, ref ramp))
             {
-                error = "The display driver rejected the shadow-lift change. Try borderless-windowed mode or update the GPU driver.";
+                error = "The display driver rejected the gamma or shadow-lift change. Try borderless-windowed mode or update the GPU driver.";
                 return false;
             }
 

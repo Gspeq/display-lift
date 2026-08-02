@@ -8,5 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\src\DisplayLift\ColorMatrixBuilder.cs" Link="ColorMatrixBuilder.cs" />
+    <Compile Include="..\..\src\DisplayLift\DisplayProfile.cs" Link="DisplayProfile.cs" />
   </ItemGroup>
 </Project>
