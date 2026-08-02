@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+dist/
+*.user
+*.suo
+.vs/
+DisplayLift-win-*.zip
+DisplayLift-win-*.zip.sha256
