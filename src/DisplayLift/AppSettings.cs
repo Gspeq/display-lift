@@ -2,7 +2,7 @@ namespace DisplayLift;
 
 internal sealed class AppSettings
 {
-    public int Version { get; set; } = 8;
+    public int Version { get; set; } = 9;
     public string RustExecutablePath { get; set; } = string.Empty;
     public bool AutoDetectScene { get; set; } = true;
     public RustScene ManualScene { get; set; } = RustScene.Balanced;
@@ -19,7 +19,7 @@ internal sealed class AppSettings
 
     public void Validate()
     {
-        Version = 8;
+        Version = 9;
         RustExecutablePath ??= string.Empty;
         ColorStrengthPercent = Math.Clamp(ColorStrengthPercent, 50, 150);
         BrightnessTrimPercent = Math.Clamp(BrightnessTrimPercent, -15, 15);

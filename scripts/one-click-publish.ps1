@@ -1,4 +1,4 @@
-# DisplayLift-Publisher-Version: 8
+# DisplayLift-Publisher-Version: 9
 [CmdletBinding()]
 param(
     [string]$RepoName = 'display-lift',
@@ -65,12 +65,12 @@ function Assert-LastExitCode {
 function New-DesktopShortcut {
     param([Parameter(Mandatory)] [string]$TargetPath)
     $desktop = [Environment]::GetFolderPath('Desktop')
-    $shortcutPath = Join-Path $desktop 'DisplayLift Rust Auto.lnk'
+    $shortcutPath = Join-Path $desktop 'DisplayLift Rust Auto Restore-Safe.lnk'
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($shortcutPath)
     $shortcut.TargetPath = $TargetPath
     $shortcut.WorkingDirectory = Split-Path -Parent $TargetPath
-    $shortcut.Description = 'Rust automatic scene and display color manager'
+    $shortcut.Description = 'Rust automatic scene manager with guaranteed close restoration'
     $shortcut.IconLocation = "$TargetPath,0"
     $shortcut.Save()
     Write-Host "Desktop shortcut: $shortcutPath" -ForegroundColor Green
@@ -132,7 +132,7 @@ try {
 
     $StagedDiff = Invoke-CapturedProcess -FilePath 'git' -ArgumentList @('diff', '--cached', '--quiet')
     if ($StagedDiff.ExitCode -eq 1) {
-        git commit -m 'Add Rust auto region visual detection'
+        git commit -m 'Guarantee display restoration on close'
         Assert-LastExitCode 'git commit failed.'
     }
     elseif ($StagedDiff.ExitCode -ne 0) {
@@ -206,7 +206,7 @@ try {
     Write-Host ''
     Write-Host "Published and verified: $FullRepo" -ForegroundColor Green
     Write-Host "Local HEAD and origin/$Branch are identical." -ForegroundColor Green
-    Write-Host 'Launching DisplayLift Rust Auto Visuals...' -ForegroundColor Green
+    Write-Host 'Launching DisplayLift V9 restore-safe Rust visuals...' -ForegroundColor Green
     Start-Process -FilePath $Exe -WorkingDirectory (Split-Path -Parent $Exe)
     gh repo view --web
 }

@@ -1,39 +1,46 @@
-# DisplayLift V8 — Rust Auto Region Visuals
+# DisplayLift V9 — Rust Auto Region, Restore-Safe
 
-DisplayLift is a Windows 10/11 display-color utility designed around one built-in Rust configuration. It automatically watches for `RustClient.exe`, samples broad screen colors while Rust is foreground, and selects a tuned visual mode for temperate terrain, desert, snow, coastline/water, or dark night/interior scenes.
+DisplayLift is a Windows display utility that applies external color, contrast, gamma, shadow and NVIDIA Digital Vibrance adjustments while Rust is active. It does not inject into Rust, modify game files, read game memory or create an in-game overlay.
 
-## What changed in V8
+## V9 restoration fix
 
-- One Rust target; no profile list or profile-management tab.
-- Automatic screen-color scene detection with rolling averages and switch hysteresis.
-- Six manual fallback buttons: Balanced, Temperate, Desert, Snow, Coast and Night.
-- Four clean global trims: Color, Brightness, Contrast and Shadows.
-- Rust installation auto-discovery with browse and Steam-launch fallbacks.
-- NVIDIA Digital Vibrance through NVAPI when supported, plus Windows color-matrix and gamma controls.
-- Desktop restoration whenever Rust loses focus, optional startup, tray controls and global hotkeys.
+V9 corrects the stale-color problem from earlier builds:
 
-## Automatic detection limits
+- Clicking **X now exits the application** instead of silently hiding it in the tray.
+- Every normal close runs three restoration paths: captured baseline restoration, a hard Windows identity/gamma reset, and NVIDIA Digital Vibrance reset to the driver default.
+- Startup closes older DisplayLift processes and normalizes the display before capturing a new baseline.
+- A stable cross-version mutex prevents old and new versions from running together.
+- `--restore-only` performs an emergency reset without opening the interface.
+- Manual region buttons produce a visible 10-second desktop preview when Rust is not foreground, then automatically restore normal colors.
 
-The detector does not read Rust memory, the map, coordinates, game files or network traffic. It samples six small screen patches in memory and discards them immediately. Weather, sunsets, skins, monuments and custom maps can make visual classification ambiguous. DisplayLift therefore waits for repeated readings before switching and always keeps the manual scene buttons visible.
+## Usage
 
-For the most reliable screen sampling, use Rust in borderless-windowed mode. Exclusive fullscreen or protected capture paths may return a blank image; the app then stays on Balanced and asks you to choose a scene manually.
+Run `dist\DisplayLift.exe`. Keep **Auto Region** enabled for automatic Temperate, Desert, Snow, Coast and Night/Interior switching while `RustClient.exe` is foreground.
 
-## Hotkeys
+Manual buttons can be used inside Rust. Outside Rust, they intentionally create only a 10-second preview so you can verify that a button works without leaving the desktop altered.
 
-- `Ctrl+Alt+F8` — return to Auto Region
-- `Ctrl+Alt+F9` — cycle manual scenes
-- `Ctrl+Alt+F10` — restore original desktop colors
+Hotkeys:
 
-## Safety boundary
+- `Ctrl+Alt+F8` — return to automatic mode
+- `Ctrl+Alt+F9` — cycle manual regions
+- `Ctrl+Alt+F10` — restore normal colors and pause
 
-DisplayLift is external display software. It does not inject DLLs, hook DirectX, modify Rust files, inspect process memory, draw an overlay, automate input or bypass Easy Anti-Cheat. It cannot guarantee how future Facepunch or EAC policy changes will treat any third-party utility.
+The minimize button can still hide DisplayLift to the tray when that option is enabled. The window **X always exits and restores normal display settings**.
+
+## Emergency recovery
+
+Run:
+
+```powershell
+.\dist\DisplayLift.exe --restore-only
+```
+
+This closes other DisplayLift instances and resets Windows color effects, gamma/shadow lift and NVIDIA Digital Vibrance to normal defaults.
 
 ## Build
 
 Double-click `ONE-CLICK-BUILD.cmd`, or run:
 
 ```powershell
-./scripts/build.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1
 ```
-
-The output is `dist/DisplayLift.exe`.

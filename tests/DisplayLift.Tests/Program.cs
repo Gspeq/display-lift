@@ -55,6 +55,13 @@ var noisyTemperate = new SceneAnalysis(RustScene.Temperate, 0.51, temperate.Metr
 var second = stabilizer.Update(noisyTemperate, 60);
 Assert(second.Scene == RustScene.Desert, "A single conflicting sample must not immediately switch scenes");
 
+
+var linear = DisplayRecovery.BuildLinearChannel();
+Assert(linear.Length == 256, "Recovery gamma channel must have 256 entries");
+Assert(linear[0] == 0, "Recovery gamma channel must begin at zero");
+Assert(linear[255] == ushort.MaxValue, "Recovery gamma channel must end at full scale");
+Assert(linear.Zip(linear.Skip(1), (left, right) => right >= left).All(value => value), "Recovery gamma channel must be monotonic");
+
 try
 {
     _ = ColorMatrixBuilder.Build(5.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
@@ -66,10 +73,10 @@ catch (ArgumentOutOfRangeException)
 
 if (failures.Count > 0)
 {
-    Console.Error.WriteLine("DisplayLift V8 tests failed:");
+    Console.Error.WriteLine("DisplayLift V9 tests failed:");
     foreach (var failure in failures) Console.Error.WriteLine($"  - {failure}");
     return 1;
 }
 
-Console.WriteLine("DisplayLift V8 auto-scene, preset, stabilization and color-matrix tests passed.");
+Console.WriteLine("DisplayLift V9 auto-scene, recovery, preset, stabilization and color-matrix tests passed.");
 return 0;

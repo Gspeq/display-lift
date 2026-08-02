@@ -18,16 +18,19 @@ $ExpectedManagedFiles = @(
     'THIRD-PARTY-NOTICES.md',
     'scripts/build.ps1',
     'scripts/one-click-publish.ps1',
+    'scripts/reset-windows-color.ps1',
     'src/DisplayLift/AppSettings.cs',
     'src/DisplayLift/app.manifest',
     'src/DisplayLift/ColorEffectController.cs',
     'src/DisplayLift/ColorMatrixBuilder.cs',
     'src/DisplayLift/DisplayEffectEngine.cs',
+    'src/DisplayLift/DisplayRecovery.cs',
     'src/DisplayLift/DisplayLift.csproj',
     'src/DisplayLift/ForegroundProcess.cs',
     'src/DisplayLift/GammaController.cs',
     'src/DisplayLift/MainForm.cs',
     'src/DisplayLift/NvidiaVibranceController.cs',
+    'src/DisplayLift/PreviousInstanceTerminator.cs',
     'src/DisplayLift/Program.cs',
     'src/DisplayLift/RustLocator.cs',
     'src/DisplayLift/RustScene.cs',
@@ -101,6 +104,14 @@ $HashGroups = $ExpectedManagedFiles | ForEach-Object {
 foreach ($group in $HashGroups) {
     Add-Failure "Byte-for-byte duplicate managed files detected: $(($group.Group.Path | Sort-Object) -join ', ')"
 }
+
+$ProgramSource = Get-Content -LiteralPath (Join-Path $RepoRoot 'src\DisplayLift\Program.cs') -Raw
+$MainFormSource = Get-Content -LiteralPath (Join-Path $RepoRoot 'src\DisplayLift\MainForm.cs') -Raw
+if (-not $ProgramSource.Contains('"Local\\DisplayLift.SingleInstance"')) { Add-Failure 'Program does not use the stable cross-version single-instance mutex.' }
+if ($ProgramSource -notmatch 'DisplayRecovery\.ResetToSystemDefaults') { Add-Failure 'Program does not perform startup/final display recovery.' }
+if ($MainFormSource -notmatch 'X always exits') { Add-Failure 'The interface does not clearly state that X exits.' }
+if ($MainFormSource -notmatch 'Final hard reset prevents a stale transform') { Add-Failure 'The form shutdown path does not contain the final display reset.' }
+if ($MainFormSource -match 'eventArgs\.Cancel = true;\s*HideToTray') { Add-Failure 'Closing the window can still silently hide it to the tray.' }
 
 if (($RequireClean -or $RequireRemoteSync) -and (Test-Path -LiteralPath (Join-Path $RepoRoot '.git'))) {
     Push-Location $RepoRoot

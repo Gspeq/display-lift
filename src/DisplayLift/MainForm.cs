@@ -61,15 +61,17 @@ internal sealed class MainForm : Form
     private RustScene? _activeScene;
     private bool _effectsApplied;
     private bool _syncingControls;
-    private bool _allowClose;
     private bool _shutdown;
     private bool _suspended;
+    private DateTime _manualPreviewExpiresUtc = DateTime.MinValue;
+    private readonly string _startupRecoveryMessage;
 
-    public MainForm(bool startMinimized)
+    public MainForm(bool startMinimized, string startupRecoveryMessage)
     {
+        _startupRecoveryMessage = startupRecoveryMessage;
         _settings = _store.Load();
 
-        Text = "DisplayLift — Rust Auto Visuals";
+        Text = "DisplayLift V9 — Rust Auto Restore-Safe";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1020, 700);
         Size = new Size(1120, 760);
@@ -94,13 +96,19 @@ internal sealed class MainForm : Form
         _reapplyTimer.Tick += (_, _) =>
         {
             _reapplyTimer.Stop();
-            if (ForegroundProcess.IsRust(ForegroundProcess.GetInfo().ProcessName))
-                ApplyScene(_settings.AutoDetectScene ? (_activeScene ?? RustScene.Balanced) : _settings.ManualScene, "Tuning updated");
+            var rustForeground = ForegroundProcess.IsRust(ForegroundProcess.GetInfo().ProcessName);
+            var previewActive = _manualPreviewExpiresUtc > DateTime.UtcNow;
+            if (rustForeground || previewActive)
+                ApplyScene(_settings.AutoDetectScene ? (_activeScene ?? RustScene.Balanced) : _settings.ManualScene, previewActive && !rustForeground ? "Desktop preview updated" : "Tuning updated");
         };
 
         Shown += (_, _) =>
         {
             RegisterGlobalHotkeys();
+            _footerStatusLabel.Text = string.IsNullOrWhiteSpace(_startupRecoveryMessage)
+                ? "Display state normalized before startup."
+                : _startupRecoveryMessage;
+            _footerStatusLabel.ForeColor = MutedColor;
             EvaluateRustState();
             if (startMinimized) HideToTray();
         };
@@ -400,7 +408,7 @@ internal sealed class MainForm : Form
         ConfigureCheck(_nvidiaCheck, "Use NVIDIA driver vibrance when available", 20, 45);
         ConfigureCheck(_restoreCheck, "Restore desktop colors when Rust loses focus", 20, 76);
         ConfigureCheck(_startupCheck, "Start DisplayLift with Windows", 20, 107);
-        ConfigureCheck(_trayCheck, "Minimize to the system tray", 20, 138);
+        ConfigureCheck(_trayCheck, "Minimize button hides to tray — X always exits", 20, 138);
         card.Controls.Add(_nvidiaCheck);
         card.Controls.Add(_restoreCheck);
         card.Controls.Add(_startupCheck);
@@ -494,11 +502,17 @@ internal sealed class MainForm : Form
 
         if (!rustForeground)
         {
-            _rustStateLabel.Text = rustRunning ? "RUST RUNNING — ALT-TABBED" : "WAITING FOR RUST";
-            _rustStateLabel.ForeColor = rustRunning ? WarningColor : MutedColor;
-            _confidenceLabel.Text = _settings.AutoDetectScene ? "Auto detection starts when Rust is foreground" : $"Manual: {RustSceneCatalog.GetName(_settings.ManualScene)}";
+            var previewWasScheduled = _manualPreviewExpiresUtc != DateTime.MinValue;
+            var previewActive = _manualPreviewExpiresUtc > DateTime.UtcNow;
+            _rustStateLabel.Text = previewActive ? "DESKTOP PREVIEW" : rustRunning ? "RUST RUNNING — ALT-TABBED" : "WAITING FOR RUST";
+            _rustStateLabel.ForeColor = previewActive ? GoodColor : rustRunning ? WarningColor : MutedColor;
+            _confidenceLabel.Text = previewActive
+                ? $"Preview ends in {Math.Max(1, (int)Math.Ceiling((_manualPreviewExpiresUtc - DateTime.UtcNow).TotalSeconds))} seconds"
+                : _settings.AutoDetectScene ? "Auto detection starts when Rust is foreground" : $"Manual: {RustSceneCatalog.GetName(_settings.ManualScene)}";
             _confidenceBar.Value = 0;
-            if (_effectsApplied && _settings.RestoreWhenRustInactive) RestoreOriginal(null, suspend: false);
+            if (previewActive) return;
+            _manualPreviewExpiresUtc = DateTime.MinValue;
+            if (_effectsApplied && (previewWasScheduled || _settings.RestoreWhenRustInactive)) RestoreOriginal(null, suspend: false);
             return;
         }
 
@@ -566,6 +580,7 @@ internal sealed class MainForm : Form
         var result = _effects.Restore();
         _effectsApplied = false;
         _activeScene = null;
+        _manualPreviewExpiresUtc = DateTime.MinValue;
         if (suspend) _suspended = true;
         _footerStatusLabel.Text = message ?? result.Message;
         _footerStatusLabel.ForeColor = MutedColor;
@@ -575,6 +590,7 @@ internal sealed class MainForm : Form
     private void EnableAutoMode()
     {
         _suspended = false;
+        _manualPreviewExpiresUtc = DateTime.MinValue;
         _syncingControls = true;
         _autoToggle.Checked = true;
         _syncingControls = false;
@@ -597,13 +613,16 @@ internal sealed class MainForm : Form
         SaveSettings();
         UpdateAutoToggleAppearance();
         UpdateSceneButtons();
-        if (ForegroundProcess.IsRust(ForegroundProcess.GetInfo().ProcessName)) ApplyScene(scene, "Manual region");
+        if (ForegroundProcess.IsRust(ForegroundProcess.GetInfo().ProcessName))
+        {
+            _manualPreviewExpiresUtc = DateTime.MinValue;
+            ApplyScene(scene, "Manual region");
+        }
         else
         {
-            _sceneLabel.Text = RustSceneCatalog.GetName(scene);
-            _sceneDescriptionLabel.Text = RustSceneCatalog.GetDescription(scene);
-            _confidenceLabel.Text = "Manual region ready — launch or focus Rust";
-            _effectDetailsLabel.Text = RustVisualPresets.Create(scene, _settings).ToCompactString();
+            _manualPreviewExpiresUtc = DateTime.UtcNow.AddSeconds(10);
+            ApplyScene(scene, "10-second desktop preview");
+            _sceneDescriptionLabel.Text = $"{RustSceneCatalog.GetDescription(scene)} This preview automatically restores normal colors.";
         }
     }
 
@@ -743,7 +762,7 @@ internal sealed class MainForm : Form
 
         var icon = new NotifyIcon
         {
-            Text = "DisplayLift Rust Auto Visuals",
+            Text = "DisplayLift V9 Rust Auto Restore-Safe",
             Icon = SystemIcons.Application,
             Visible = true,
             ContextMenuStrip = menu
@@ -776,18 +795,12 @@ internal sealed class MainForm : Form
 
     private void HandleFormClosing(object? sender, FormClosingEventArgs eventArgs)
     {
-        if (!_allowClose && eventArgs.CloseReason == CloseReason.UserClosing && _settings.MinimizeToTray)
-        {
-            eventArgs.Cancel = true;
-            HideToTray();
-            return;
-        }
+        eventArgs.Cancel = false;
         Shutdown();
     }
 
     private void ExitApplication()
     {
-        _allowClose = true;
         Close();
     }
 
@@ -803,7 +816,14 @@ internal sealed class MainForm : Form
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
         _detector.Dispose();
+
+        try { _ = _effects.Restore(); }
+        catch { }
         _effects.Dispose();
+
+        // Final hard reset prevents a stale transform from surviving a normal close.
+        try { _ = DisplayRecovery.ResetToSystemDefaults(); }
+        catch { }
     }
 
     private static Panel NewCard(string title)

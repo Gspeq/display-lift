@@ -15,7 +15,7 @@ internal sealed class SettingsStore
     public SettingsStore()
     {
         DirectoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DisplayLift");
-        FilePath = Path.Combine(DirectoryPath, "settings-v8.json");
+        FilePath = Path.Combine(DirectoryPath, "settings-v9.json");
     }
 
     public string DirectoryPath { get; }
@@ -26,8 +26,11 @@ internal sealed class SettingsStore
         AppSettings settings;
         try
         {
-            settings = File.Exists(FilePath)
-                ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath), JsonOptions) ?? new AppSettings()
+            var sourcePath = File.Exists(FilePath)
+                ? FilePath
+                : Path.Combine(DirectoryPath, "settings-v8.json");
+            settings = File.Exists(sourcePath)
+                ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(sourcePath), JsonOptions) ?? new AppSettings()
                 : new AppSettings();
         }
         catch
@@ -92,7 +95,7 @@ internal sealed class SettingsStore
         {
             if (!File.Exists(FilePath)) return;
             Directory.CreateDirectory(DirectoryPath);
-            File.Copy(FilePath, Path.Combine(DirectoryPath, $"settings-v8-damaged-{DateTime.Now:yyyyMMdd-HHmmss}.json"));
+            File.Copy(FilePath, Path.Combine(DirectoryPath, $"settings-v9-damaged-{DateTime.Now:yyyyMMdd-HHmmss}.json"));
         }
         catch
         {

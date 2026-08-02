@@ -37,14 +37,14 @@ if ($Running.Count -gt 0) {
     Start-Sleep -Milliseconds 500
 }
 
-Write-Host 'Running V8 auto-scene, preset and color-matrix tests...'
+Write-Host 'Running V9 auto-scene, recovery, preset and color-matrix tests...'
 dotnet run --project $TestProject --configuration Release
 if ($LASTEXITCODE -ne 0) { throw 'DisplayLift tests failed.' }
 
 if (Test-Path $Dist) { Remove-Item $Dist -Recurse -Force }
 New-Item $Dist -ItemType Directory | Out-Null
 
-Write-Host "Publishing DisplayLift V8 for $Runtime..."
+Write-Host "Publishing DisplayLift V9 for $Runtime..."
 dotnet publish $Project `
     --configuration Release `
     --runtime $Runtime `
@@ -58,6 +58,10 @@ $Exe = Join-Path $Dist 'DisplayLift.exe'
 if (-not (Test-Path $Exe)) { throw "Build completed without producing $Exe" }
 $BuiltExecutables = @(Get-ChildItem -LiteralPath $Dist -Filter 'DisplayLift*.exe' -File)
 if ($BuiltExecutables.Count -ne 1) { throw "Expected exactly one DisplayLift executable in dist, but found $($BuiltExecutables.Count)." }
+
+Write-Host 'Running the compiled emergency restore self-test...'
+$RestoreProcess = Start-Process -FilePath $Exe -ArgumentList '--restore-only' -Wait -PassThru
+if ($RestoreProcess.ExitCode -ne 0) { throw 'The compiled restore-only self-test failed.' }
 
 $Zip = Join-Path $RepoRoot "DisplayLift-$Runtime.zip"
 if (Test-Path $Zip) { Remove-Item $Zip -Force }
