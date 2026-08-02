@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title DisplayLift V7 Build and Publish
+cd /d "%~dp0"
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\one-click-publish.ps1"
 if errorlevel 1 (
   echo.
@@ -9,5 +9,5 @@ if errorlevel 1 (
   exit /b 1
 )
 echo.
-echo DisplayLift V7 built, synchronized and launched.
+echo Build, tests and GitHub synchronization completed successfully.
 pause

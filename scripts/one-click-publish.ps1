@@ -1,4 +1,4 @@
-# DisplayLift-Publisher-Version: 7
+# DisplayLift-Publisher-Version: 8
 [CmdletBinding()]
 param(
     [string]$RepoName = 'display-lift',
@@ -65,12 +65,12 @@ function Assert-LastExitCode {
 function New-DesktopShortcut {
     param([Parameter(Mandatory)] [string]$TargetPath)
     $desktop = [Environment]::GetFolderPath('Desktop')
-    $shortcutPath = Join-Path $desktop 'DisplayLift Visual Panel.lnk'
+    $shortcutPath = Join-Path $desktop 'DisplayLift Rust Auto.lnk'
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($shortcutPath)
     $shortcut.TargetPath = $TargetPath
     $shortcut.WorkingDirectory = Split-Path -Parent $TargetPath
-    $shortcut.Description = 'Rust visual profile and display color manager'
+    $shortcut.Description = 'Rust automatic scene and display color manager'
     $shortcut.IconLocation = "$TargetPath,0"
     $shortcut.Save()
     Write-Host "Desktop shortcut: $shortcutPath" -ForegroundColor Green
@@ -132,7 +132,7 @@ try {
 
     $StagedDiff = Invoke-CapturedProcess -FilePath 'git' -ArgumentList @('diff', '--cached', '--quiet')
     if ($StagedDiff.ExitCode -eq 1) {
-        git commit -m 'Add No-Mercy-style Rust visual panel and profiles'
+        git commit -m 'Add Rust auto region visual detection'
         Assert-LastExitCode 'git commit failed.'
     }
     elseif ($StagedDiff.ExitCode -ne 0) {
@@ -153,7 +153,7 @@ try {
         $RepoView = Invoke-CapturedProcess -FilePath 'gh' -ArgumentList @('repo', 'view', $FullRepo, '--json', 'nameWithOwner', '--jq', '.nameWithOwner')
         if ($RepoView.ExitCode -ne 0) {
             $VisibilityFlag = "--$Visibility"
-            gh repo create $FullRepo $VisibilityFlag --description 'An external Windows Rust visual profile panel with real-time saturation, vibrance, brightness, contrast, exposure, gamma and biome presets.'
+            gh repo create $FullRepo $VisibilityFlag --description 'An external Windows Rust visual utility with automatic screen-color scene detection and biome-tuned display settings.'
             Assert-LastExitCode 'GitHub repository creation failed.'
         }
         else {
@@ -206,7 +206,7 @@ try {
     Write-Host ''
     Write-Host "Published and verified: $FullRepo" -ForegroundColor Green
     Write-Host "Local HEAD and origin/$Branch are identical." -ForegroundColor Green
-    Write-Host 'Launching DisplayLift Visual Panel...' -ForegroundColor Green
+    Write-Host 'Launching DisplayLift Rust Auto Visuals...' -ForegroundColor Green
     Start-Process -FilePath $Exe -WorkingDirectory (Split-Path -Parent $Exe)
     gh repo view --web
 }

@@ -6,138 +6,109 @@ namespace DisplayLift;
 internal sealed class MainForm : Form
 {
     private const int WmHotkey = 0x0312;
-    private const int CycleHotkeyId = 7001;
-    private const int RestoreHotkeyId = 7002;
-    private const int AutoHotkeyId = 7003;
+    private const int AutoHotkeyId = 8101;
+    private const int CycleHotkeyId = 8102;
+    private const int RestoreHotkeyId = 8103;
     private const uint ModAlt = 0x0001;
     private const uint ModControl = 0x0002;
 
-    private static readonly Color WindowColor = Color.FromArgb(16, 18, 20);
-    private static readonly Color PanelColor = Color.FromArgb(25, 28, 31);
-    private static readonly Color CardColor = Color.FromArgb(31, 35, 39);
-    private static readonly Color InputColor = Color.FromArgb(38, 42, 46);
-    private static readonly Color AccentColor = Color.FromArgb(235, 103, 45);
-    private static readonly Color AccentHoverColor = Color.FromArgb(255, 124, 62);
-    private static readonly Color MutedColor = Color.FromArgb(171, 178, 185);
-    private static readonly Color SuccessColor = Color.FromArgb(66, 201, 127);
+    private static readonly Color BackgroundColor = Color.FromArgb(14, 16, 18);
+    private static readonly Color HeaderColor = Color.FromArgb(20, 23, 26);
+    private static readonly Color CardColor = Color.FromArgb(25, 29, 33);
+    private static readonly Color CardRaisedColor = Color.FromArgb(31, 36, 41);
+    private static readonly Color BorderColor = Color.FromArgb(49, 55, 61);
+    private static readonly Color AccentColor = Color.FromArgb(239, 104, 47);
+    private static readonly Color AccentHoverColor = Color.FromArgb(255, 127, 65);
+    private static readonly Color TextColor = Color.FromArgb(241, 243, 245);
+    private static readonly Color MutedColor = Color.FromArgb(164, 171, 178);
+    private static readonly Color GoodColor = Color.FromArgb(71, 196, 125);
+    private static readonly Color WarningColor = Color.FromArgb(245, 183, 66);
 
-    private readonly ProfileStore _profileStore = new();
-    private readonly AppConfiguration _configuration;
+    private readonly SettingsStore _store = new();
+    private readonly AppSettings _settings;
     private readonly DisplayEffectEngine _effects = new();
-    private readonly System.Windows.Forms.Timer _profileTimer = new();
-    private readonly System.Windows.Forms.Timer _previewTimer = new();
+    private readonly ScreenSceneDetector _detector = new();
+    private readonly SceneStabilizer _stabilizer = new();
+    private readonly System.Windows.Forms.Timer _monitorTimer = new();
+    private readonly System.Windows.Forms.Timer _reapplyTimer = new();
     private readonly NotifyIcon _trayIcon;
 
-    private readonly TabControl _tabs = new();
-    private readonly ListBox _profileList = new();
-    private readonly ComboBox _profileSelector = new();
-    private readonly TextBox _nameBox = new();
-    private readonly TextBox _processBox = new();
-    private readonly TextBox _pathBox = new();
-    private readonly ComboBox _triggerBox = new();
-    private readonly NumericUpDown _priorityBox = new();
-    private readonly CheckBox _enabledBox = new();
-    private readonly CheckBox _restoreOnDeactivateBox = new();
-    private readonly CheckBox _useNvidiaBox = new();
-    private readonly CheckBox _livePreviewBox = new();
-    private readonly CheckBox _autoStartBox = new();
-    private readonly CheckBox _restoreInactiveBox = new();
-    private readonly CheckBox _minimizeToTrayBox = new();
-    private readonly NumericUpDown _pollIntervalBox = new();
+    private readonly Label _rustStateLabel = new();
+    private readonly Label _sceneLabel = new();
+    private readonly Label _confidenceLabel = new();
+    private readonly Label _sceneDescriptionLabel = new();
+    private readonly Label _detectorDetailsLabel = new();
+    private readonly Label _effectDetailsLabel = new();
+    private readonly Label _backendLabel = new();
+    private readonly Label _pathLabel = new();
+    private readonly Label _footerStatusLabel = new();
+    private readonly ProgressBar _confidenceBar = new();
+    private readonly CheckBox _autoToggle = new();
+    private readonly CheckBox _nvidiaCheck = new();
+    private readonly CheckBox _restoreCheck = new();
+    private readonly CheckBox _startupCheck = new();
+    private readonly CheckBox _trayCheck = new();
+    private readonly TrackBar _colorTrack = CreateTrackBar(50, 150, 100, 10);
+    private readonly TrackBar _brightnessTrack = CreateTrackBar(-15, 15, 0, 3);
+    private readonly TrackBar _contrastTrack = CreateTrackBar(60, 150, 100, 10);
+    private readonly TrackBar _shadowTrack = CreateTrackBar(50, 170, 100, 10);
+    private readonly Label _colorValue = NewValueLabel();
+    private readonly Label _brightnessValue = NewValueLabel();
+    private readonly Label _contrastValue = NewValueLabel();
+    private readonly Label _shadowValue = NewValueLabel();
+    private readonly Dictionary<RustScene, Button> _sceneButtons = new();
 
-    private readonly TrackBar _saturationTrack = CreateTrackBar(0, 300, 152, 10);
-    private readonly TrackBar _vibranceTrack = CreateTrackBar(0, 100, 80, 10);
-    private readonly TrackBar _brightnessTrack = CreateTrackBar(-20, 20, 6, 2);
-    private readonly TrackBar _contrastTrack = CreateTrackBar(50, 150, 105, 5);
-    private readonly TrackBar _exposureTrack = CreateTrackBar(-100, 100, 0, 10);
-    private readonly TrackBar _gammaTrack = CreateTrackBar(60, 180, 108, 10);
-    private readonly TrackBar _shadowTrack = CreateTrackBar(0, 60, 8, 5);
-    private readonly TrackBar _temperatureTrack = CreateTrackBar(-100, 100, -2, 10);
-    private readonly TrackBar _tintTrack = CreateTrackBar(-100, 100, 1, 10);
-    private readonly TrackBar _redGainTrack = CreateTrackBar(70, 130, 101, 5);
-    private readonly TrackBar _greenGainTrack = CreateTrackBar(70, 130, 100, 5);
-    private readonly TrackBar _blueGainTrack = CreateTrackBar(70, 130, 103, 5);
-
-    private readonly Label _saturationValue = CreateValueLabel();
-    private readonly Label _vibranceValue = CreateValueLabel();
-    private readonly Label _brightnessValue = CreateValueLabel();
-    private readonly Label _contrastValue = CreateValueLabel();
-    private readonly Label _exposureValue = CreateValueLabel();
-    private readonly Label _gammaValue = CreateValueLabel();
-    private readonly Label _shadowValue = CreateValueLabel();
-    private readonly Label _temperatureValue = CreateValueLabel();
-    private readonly Label _tintValue = CreateValueLabel();
-    private readonly Label _redGainValue = CreateValueLabel();
-    private readonly Label _greenGainValue = CreateValueLabel();
-    private readonly Label _blueGainValue = CreateValueLabel();
-
-    private readonly Label _engineStatusLabel = new();
-    private readonly Label _activeModeLabel = new();
-    private readonly Label _foregroundLabel = new();
-    private readonly Label _driverLabel = new();
-    private readonly Label _presetDescriptionLabel = new();
-    private readonly Label _selectedProfileLabel = new();
-    private readonly Label _rustPathLabel = new();
-
-    private DisplayProfile? _editingProfile;
-    private Guid? _activeProfileId;
-    private bool _loadingEditor;
-    private bool _syncingSelection;
-    private bool _manualMode;
+    private RustScene? _activeScene;
+    private bool _effectsApplied;
+    private bool _syncingControls;
     private bool _allowClose;
     private bool _shutdown;
+    private bool _suspended;
 
     public MainForm(bool startMinimized)
     {
-        _configuration = _profileStore.Load();
+        _settings = _store.Load();
 
-        Text = "DisplayLift Visual Panel";
+        Text = "DisplayLift — Rust Auto Visuals";
         StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(1040, 720);
-        Size = new Size(1240, 830);
-        BackColor = WindowColor;
-        ForeColor = Color.WhiteSmoke;
+        MinimumSize = new Size(1020, 700);
+        Size = new Size(1120, 760);
+        BackColor = BackgroundColor;
+        ForeColor = TextColor;
         Font = new Font("Segoe UI", 9.5f, FontStyle.Regular, GraphicsUnit.Point);
 
-        _trayIcon = CreateTrayIcon();
-        Controls.Add(BuildRoot());
+        _trayIcon = BuildTrayIcon();
+        Controls.Add(BuildLayout());
+        LoadSettingsIntoControls();
         HookEvents();
-        ApplyTheme(this);
+        UpdateRustPathDisplay();
+        UpdateBackendDisplay();
+        UpdateSceneButtons();
+        UpdateTuningLabels();
 
-        RefreshProfileControls(_configuration.LastSelectedProfileId);
-        LoadSettingsControls();
-        UpdateValueLabels();
-        UpdateStatus("Engine ready. Select a preset or let Rust auto-activation take over.", SuccessColor);
+        _monitorTimer.Interval = _settings.DetectionIntervalMilliseconds;
+        _monitorTimer.Tick += (_, _) => EvaluateRustState();
+        _monitorTimer.Start();
 
-        _previewTimer.Interval = 120;
-        _previewTimer.Tick += (_, _) =>
+        _reapplyTimer.Interval = 180;
+        _reapplyTimer.Tick += (_, _) =>
         {
-            _previewTimer.Stop();
-            PreviewCurrentSettings();
+            _reapplyTimer.Stop();
+            if (ForegroundProcess.IsRust(ForegroundProcess.GetInfo().ProcessName))
+                ApplyScene(_settings.AutoDetectScene ? (_activeScene ?? RustScene.Balanced) : _settings.ManualScene, "Tuning updated");
         };
-
-        _profileTimer.Interval = _configuration.PollIntervalMilliseconds;
-        _profileTimer.Tick += (_, _) => EvaluateAutomaticProfiles();
-        _profileTimer.Start();
 
         Shown += (_, _) =>
         {
             RegisterGlobalHotkeys();
-            EvaluateAutomaticProfiles();
-            if (startMinimized)
-            {
-                HideToTray();
-            }
+            EvaluateRustState();
+            if (startMinimized) HideToTray();
         };
 
         Resize += (_, _) =>
         {
-            if (WindowState == FormWindowState.Minimized && _configuration.MinimizeToTray)
-            {
-                HideToTray();
-            }
+            if (WindowState == FormWindowState.Minimized && _settings.MinimizeToTray) HideToTray();
         };
-
         FormClosing += HandleFormClosing;
     }
 
@@ -147,1227 +118,657 @@ internal sealed class MainForm : Form
         {
             switch (message.WParam.ToInt32())
             {
+                case AutoHotkeyId:
+                    EnableAutoMode();
+                    return;
                 case CycleHotkeyId:
-                    CycleRustPreset();
+                    CycleManualScene();
                     return;
                 case RestoreHotkeyId:
-                    RestoreOriginal(showMessage: true);
-                    return;
-                case AutoHotkeyId:
-                    ResumeAutomaticProfiles();
+                    RestoreOriginal("Restored with Ctrl+Alt+F10 — automatic changes paused", suspend: true);
                     return;
             }
         }
-
         base.WndProc(ref message);
     }
 
-    private Control BuildRoot()
+    private Control BuildLayout()
     {
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 2,
-            BackColor = WindowColor,
-            Padding = new Padding(0)
+            RowCount = 3,
+            BackColor = BackgroundColor,
+            Padding = Padding.Empty
         };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
         root.Controls.Add(BuildHeader(), 0, 0);
-
-        _tabs.Dock = DockStyle.Fill;
-        _tabs.DrawMode = TabDrawMode.OwnerDrawFixed;
-        _tabs.ItemSize = new Size(150, 38);
-        _tabs.SizeMode = TabSizeMode.Fixed;
-        _tabs.Padding = new Point(18, 6);
-        _tabs.DrawItem += DrawTab;
-        _tabs.TabPages.Add(BuildRustVisualTab());
-        _tabs.TabPages.Add(BuildProfilesTab());
-        _tabs.TabPages.Add(BuildAdvancedTab());
-        _tabs.TabPages.Add(BuildAutomationTab());
-        root.Controls.Add(_tabs, 0, 1);
+        root.Controls.Add(BuildBody(), 0, 1);
+        root.Controls.Add(BuildFooter(), 0, 2);
         return root;
     }
 
     private Control BuildHeader()
     {
-        var header = new Panel
-        {
-            Dock = DockStyle.Fill,
-            BackColor = PanelColor,
-            Padding = new Padding(24, 12, 24, 10)
-        };
-
-        var title = new Label
+        var panel = new Panel { Dock = DockStyle.Fill, BackColor = HeaderColor, Padding = new Padding(26, 12, 26, 10) };
+        panel.Controls.Add(new Label
         {
             Text = "DISPLAYLIFT",
             AutoSize = true,
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI Semibold", 18f, FontStyle.Bold),
-            Location = new Point(24, 12)
+            ForeColor = TextColor,
+            Font = new Font("Segoe UI Semibold", 19f, FontStyle.Bold),
+            Location = new Point(26, 11)
+        });
+        panel.Controls.Add(new Label
+        {
+            Text = "RUST AUTO REGION VISUALS  •  SCREEN-COLOR DETECTION  •  NO GAME INJECTION",
+            AutoSize = true,
+            ForeColor = MutedColor,
+            Location = new Point(29, 49)
+        });
+
+        var restore = NewButton("RESTORE ORIGINAL", secondary: true);
+        restore.Size = new Size(168, 36);
+        restore.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        restore.Click += (_, _) => RestoreOriginal("Original display settings restored — automatic changes paused", suspend: true);
+        panel.Controls.Add(restore);
+        panel.Resize += (_, _) => restore.Location = new Point(panel.ClientSize.Width - restore.Width - 26, 20);
+        return panel;
+    }
+
+    private Control BuildBody()
+    {
+        var body = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            Padding = new Padding(18),
+            BackColor = BackgroundColor
         };
+        body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 59));
+        body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 41));
+
+        var left = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, Margin = new Padding(0, 0, 9, 0) };
+        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 194));
+        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 246));
+        left.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        left.Controls.Add(BuildAutoCard(), 0, 0);
+        left.Controls.Add(BuildRegionsCard(), 0, 1);
+        left.Controls.Add(BuildDetectorCard(), 0, 2);
+
+        var right = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, Margin = new Padding(9, 0, 0, 0) };
+        right.RowStyles.Add(new RowStyle(SizeType.Absolute, 278));
+        right.RowStyles.Add(new RowStyle(SizeType.Absolute, 185));
+        right.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        right.Controls.Add(BuildTuningCard(), 0, 0);
+        right.Controls.Add(BuildRustSetupCard(), 0, 1);
+        right.Controls.Add(BuildBehaviorCard(), 0, 2);
+
+        body.Controls.Add(left, 0, 0);
+        body.Controls.Add(right, 1, 0);
+        return body;
+    }
+
+    private Control BuildAutoCard()
+    {
+        var card = NewCard("AUTO REGION");
+        _rustStateLabel.Text = "WAITING FOR RUST";
+        _rustStateLabel.ForeColor = MutedColor;
+        _rustStateLabel.Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
+        _rustStateLabel.AutoSize = true;
+        _rustStateLabel.Location = new Point(20, 47);
+
+        _sceneLabel.Text = "Balanced";
+        _sceneLabel.ForeColor = TextColor;
+        _sceneLabel.Font = new Font("Segoe UI Semibold", 22f, FontStyle.Bold);
+        _sceneLabel.AutoSize = true;
+        _sceneLabel.Location = new Point(18, 72);
+
+        _confidenceLabel.Text = "Detector idle";
+        _confidenceLabel.ForeColor = MutedColor;
+        _confidenceLabel.AutoSize = true;
+        _confidenceLabel.Location = new Point(21, 113);
+
+        _confidenceBar.Location = new Point(21, 139);
+        _confidenceBar.Size = new Size(375, 8);
+        _confidenceBar.Style = ProgressBarStyle.Continuous;
+        _confidenceBar.Maximum = 100;
+
+        _sceneDescriptionLabel.Text = RustSceneCatalog.GetDescription(RustScene.Balanced);
+        _sceneDescriptionLabel.ForeColor = MutedColor;
+        _sceneDescriptionLabel.Location = new Point(21, 154);
+        _sceneDescriptionLabel.AutoEllipsis = true;
+        _sceneDescriptionLabel.Size = new Size(480, 30);
+        _sceneDescriptionLabel.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
+
+        _autoToggle.Appearance = Appearance.Button;
+        _autoToggle.Text = "AUTO ON";
+        _autoToggle.TextAlign = ContentAlignment.MiddleCenter;
+        _autoToggle.FlatStyle = FlatStyle.Flat;
+        _autoToggle.FlatAppearance.BorderSize = 0;
+        _autoToggle.Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
+        _autoToggle.Size = new Size(132, 42);
+        _autoToggle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        _autoToggle.Location = new Point(430, 58);
+        card.Resize += (_, _) => _autoToggle.Left = card.ClientSize.Width - _autoToggle.Width - 20;
+
+        card.Controls.Add(_rustStateLabel);
+        card.Controls.Add(_sceneLabel);
+        card.Controls.Add(_confidenceLabel);
+        card.Controls.Add(_confidenceBar);
+        card.Controls.Add(_sceneDescriptionLabel);
+        card.Controls.Add(_autoToggle);
+        return card;
+    }
+
+    private Control BuildRegionsCard()
+    {
+        var card = NewCard("MANUAL FALLBACK");
         var subtitle = new Label
         {
-            Text = "RUST VISUAL PANEL  •  WINDOWS 10/11  •  EXTERNAL DISPLAY CONTROLS",
-            AutoSize = true,
+            Text = "Choose a scene instantly when weather or a monument confuses automatic detection.",
             ForeColor = MutedColor,
-            Location = new Point(27, 48)
+            AutoSize = true,
+            Location = new Point(20, 43)
         };
+        card.Controls.Add(subtitle);
 
-        _engineStatusLabel.AutoSize = false;
-        _engineStatusLabel.TextAlign = ContentAlignment.MiddleCenter;
-        _engineStatusLabel.Text = "ENGINE READY";
-        _engineStatusLabel.ForeColor = Color.White;
-        _engineStatusLabel.BackColor = Color.FromArgb(37, 113, 73);
-        _engineStatusLabel.Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
-        _engineStatusLabel.Size = new Size(160, 34);
-        _engineStatusLabel.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        _engineStatusLabel.Location = new Point(Width - 210, 21);
-        header.Resize += (_, _) => _engineStatusLabel.Left = Math.Max(24, header.ClientSize.Width - _engineStatusLabel.Width - 24);
-
-        header.Controls.Add(title);
-        header.Controls.Add(subtitle);
-        header.Controls.Add(_engineStatusLabel);
-        return header;
-    }
-
-    private TabPage BuildRustVisualTab()
-    {
-        var tab = NewTab("Rust Visual");
-        var root = NewScrollingColumn();
-
-        var profileRow = new FlowLayoutPanel
-        {
-            AutoSize = true,
-            Width = 1120,
-            WrapContents = false,
-            Margin = new Padding(0, 0, 0, 12)
-        };
-        profileRow.Controls.Add(new Label
-        {
-            Text = "TUNING PROFILE",
-            AutoSize = true,
-            ForeColor = MutedColor,
-            Font = new Font(Font, FontStyle.Bold),
-            Margin = new Padding(0, 9, 12, 0)
-        });
-        _profileSelector.Width = 300;
-        _profileSelector.DropDownStyle = ComboBoxStyle.DropDownList;
-        profileRow.Controls.Add(_profileSelector);
-        _selectedProfileLabel.AutoSize = true;
-        _selectedProfileLabel.ForeColor = MutedColor;
-        _selectedProfileLabel.Margin = new Padding(16, 9, 0, 0);
-        profileRow.Controls.Add(_selectedProfileLabel);
-
-        var intro = NewCard(1120, 92);
-        intro.Controls.Add(new Label
-        {
-            Text = "CLEAN VISUALS. BETTER RUST VISIBILITY.",
-            AutoSize = true,
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI Semibold", 16f, FontStyle.Bold),
-            Location = new Point(20, 15)
-        });
-        intro.Controls.Add(new Label
-        {
-            Text = "Real-time color, vibrance, light and tone controls with one-click biome presets.",
-            AutoSize = true,
-            ForeColor = MutedColor,
-            Location = new Point(22, 51)
-        });
-        var reset = CreateSecondaryButton("RESET TO NEUTRAL", (_, _) => ApplyPreset(RustVisualPreset.Neutral));
-        reset.Location = new Point(930, 26);
-        reset.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        intro.Resize += (_, _) => reset.Left = intro.ClientSize.Width - reset.Width - 20;
-        intro.Controls.Add(reset);
-
-        var presetTitle = SectionTitle("ONE-CLICK RUST PROFILES");
-        var presets = new FlowLayoutPanel
-        {
-            AutoSize = true,
-            Width = 1120,
-            WrapContents = true,
-            Margin = new Padding(0, 4, 0, 4)
-        };
-        foreach (var preset in new[]
-        {
-            RustVisualPreset.CleanRust,
-            RustVisualPreset.Summer,
-            RustVisualPreset.Winter,
-            RustVisualPreset.Desert,
-            RustVisualPreset.Night,
-            RustVisualPreset.Competitive,
-            RustVisualPreset.MaximumColor
-        })
-        {
-            var captured = preset;
-            presets.Controls.Add(CreatePresetButton(RustPresetCatalog.GetName(preset), (_, _) => ApplyPreset(captured)));
-        }
-
-        _presetDescriptionLabel.AutoSize = true;
-        _presetDescriptionLabel.MaximumSize = new Size(1100, 0);
-        _presetDescriptionLabel.ForeColor = MutedColor;
-        _presetDescriptionLabel.Margin = new Padding(2, 5, 0, 14);
-
-        var sliderGrid = new TableLayoutPanel
-        {
-            Width = 1120,
-            AutoSize = true,
-            ColumnCount = 2,
-            Margin = new Padding(0, 0, 0, 14)
-        };
-        sliderGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        sliderGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        sliderGrid.Controls.Add(BuildSliderCard("COLOR", new[]
-        {
-            ("Saturation", _saturationTrack, _saturationValue),
-            ("Vibrance", _vibranceTrack, _vibranceValue),
-            ("Brightness", _brightnessTrack, _brightnessValue),
-            ("Contrast", _contrastTrack, _contrastValue)
-        }), 0, 0);
-        sliderGrid.Controls.Add(BuildSliderCard("LIGHT & TONE", new[]
-        {
-            ("Exposure", _exposureTrack, _exposureValue),
-            ("Gamma / midtones", _gammaTrack, _gammaValue),
-            ("Shadow lift", _shadowTrack, _shadowValue),
-            ("Temperature", _temperatureTrack, _temperatureValue),
-            ("Tint", _tintTrack, _tintValue)
-        }), 1, 0);
-
-        _livePreviewBox.Text = "LIVE PREVIEW — apply changes while dragging";
-        _livePreviewBox.AutoSize = true;
-        _livePreviewBox.Checked = true;
-        _livePreviewBox.ForeColor = Color.WhiteSmoke;
-
-        var actions = new FlowLayoutPanel
-        {
-            AutoSize = true,
-            Width = 1120,
-            WrapContents = true,
-            Margin = new Padding(0, 12, 0, 6)
-        };
-        actions.Controls.Add(CreatePrimaryButton("SAVE + APPLY", (_, _) => SaveAndApplySelectedProfile()));
-        actions.Controls.Add(CreateSecondaryButton("SAVE PROFILE", (_, _) => SaveSelectedProfile()));
-        actions.Controls.Add(CreateSecondaryButton("RESTORE ORIGINAL", (_, _) => RestoreOriginal(showMessage: true)));
-        actions.Controls.Add(CreateSecondaryButton("RESUME AUTO", (_, _) => ResumeAutomaticProfiles()));
-
-        _activeModeLabel.AutoSize = true;
-        _activeModeLabel.MaximumSize = new Size(1100, 0);
-        _activeModeLabel.ForeColor = MutedColor;
-        _activeModeLabel.Margin = new Padding(2, 8, 0, 0);
-
-        root.Controls.Add(profileRow);
-        root.Controls.Add(intro);
-        root.Controls.Add(presetTitle);
-        root.Controls.Add(presets);
-        root.Controls.Add(_presetDescriptionLabel);
-        root.Controls.Add(sliderGrid);
-        root.Controls.Add(_livePreviewBox);
-        root.Controls.Add(actions);
-        root.Controls.Add(_activeModeLabel);
-        tab.Controls.Add(root);
-        return tab;
-    }
-
-    private TabPage BuildProfilesTab()
-    {
-        var tab = NewTab("Profiles");
-        var split = new SplitContainer
-        {
-            Dock = DockStyle.Fill,
-            SplitterDistance = 380,
-            BackColor = WindowColor,
-            Padding = new Padding(18)
-        };
-
-        var left = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            RowCount = 3,
-            ColumnCount = 1,
-            BackColor = WindowColor
-        };
-        left.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        left.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        left.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        left.Controls.Add(new Label
-        {
-            Text = "SAVED APPLICATION PROFILES",
-            AutoSize = true,
-            ForeColor = Color.White,
-            Font = new Font(Font, FontStyle.Bold),
-            Margin = new Padding(0, 0, 0, 10)
-        }, 0, 0);
-
-        _profileList.Dock = DockStyle.Fill;
-        _profileList.IntegralHeight = false;
-        left.Controls.Add(_profileList, 0, 1);
-
-        var profileButtons = new FlowLayoutPanel
-        {
-            AutoSize = true,
-            Dock = DockStyle.Fill,
-            WrapContents = true,
-            Margin = new Padding(0, 10, 0, 0)
-        };
-        profileButtons.Controls.Add(CreatePrimaryButton("ADD RUNNING", (_, _) => AddRunningProfile()));
-        profileButtons.Controls.Add(CreateSecondaryButton("BROWSE EXE", (_, _) => AddProfileFromExecutable()));
-        profileButtons.Controls.Add(CreateSecondaryButton("BLANK", (_, _) => AddBlankProfile()));
-        profileButtons.Controls.Add(CreateSecondaryButton("CLONE", (_, _) => CloneSelectedProfile()));
-        profileButtons.Controls.Add(CreateSecondaryButton("DELETE", (_, _) => DeleteSelectedProfile()));
-        profileButtons.Controls.Add(CreateSecondaryButton("IMPORT", (_, _) => ImportProfile()));
-        profileButtons.Controls.Add(CreateSecondaryButton("EXPORT", (_, _) => ExportProfile()));
-        left.Controls.Add(profileButtons, 0, 2);
-        split.Panel1.Controls.Add(left);
-
-        var editorScroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = WindowColor };
-        var editor = new TableLayoutPanel
-        {
-            AutoSize = true,
-            ColumnCount = 2,
-            RowCount = 10,
-            Padding = new Padding(20),
-            BackColor = CardColor,
-            Width = 700
-        };
-        editor.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
-        editor.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 460));
-        editor.Controls.Add(new Label
-        {
-            Text = "PROFILE DETAILS",
-            AutoSize = true,
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI Semibold", 14f, FontStyle.Bold),
-            Margin = new Padding(0, 0, 0, 18)
-        }, 0, 0);
-        editor.SetColumnSpan(editor.GetControlFromPosition(0, 0), 2);
-
-        AddEditorRow(editor, 1, "Name", _nameBox);
-        AddEditorRow(editor, 2, "Process", _processBox);
-
-        var pathPanel = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2 };
-        pathPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        pathPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        _pathBox.Dock = DockStyle.Fill;
-        pathPanel.Controls.Add(_pathBox, 0, 0);
-        pathPanel.Controls.Add(CreateSecondaryButton("…", (_, _) => BrowsePathForSelectedProfile()), 1, 0);
-        AddEditorRow(editor, 3, "Executable", pathPanel);
-
-        _triggerBox.DropDownStyle = ComboBoxStyle.DropDownList;
-        _triggerBox.Items.AddRange(Enum.GetValues<ProfileTrigger>().Cast<object>().ToArray());
-        AddEditorRow(editor, 4, "Activation", _triggerBox);
-
-        _priorityBox.Minimum = 0;
-        _priorityBox.Maximum = 999;
-        _priorityBox.Width = 120;
-        AddEditorRow(editor, 5, "Priority", _priorityBox);
-
-        _enabledBox.Text = "Profile enabled";
-        _enabledBox.AutoSize = true;
-        editor.Controls.Add(_enabledBox, 1, 6);
-        _restoreOnDeactivateBox.Text = "Restore original display when this profile deactivates";
-        _restoreOnDeactivateBox.AutoSize = true;
-        editor.Controls.Add(_restoreOnDeactivateBox, 1, 7);
-
-        var info = new Label
-        {
-            AutoSize = true,
-            MaximumSize = new Size(600, 0),
-            ForeColor = MutedColor,
-            Text = "Select a profile here, then use the Rust Visual and Advanced tabs to tune its color settings. Profiles can activate only when focused or whenever their process is running.",
-            Margin = new Padding(0, 14, 0, 14)
-        };
-        editor.Controls.Add(info, 0, 8);
-        editor.SetColumnSpan(info, 2);
-
-        var editorActions = new FlowLayoutPanel { AutoSize = true, WrapContents = true };
-        editorActions.Controls.Add(CreatePrimaryButton("SAVE PROFILE", (_, _) => SaveSelectedProfile()));
-        editorActions.Controls.Add(CreateSecondaryButton("OPEN VISUAL TUNING", (_, _) => _tabs.SelectedIndex = 0));
-        editor.Controls.Add(editorActions, 0, 9);
-        editor.SetColumnSpan(editorActions, 2);
-        editorScroll.Controls.Add(editor);
-        split.Panel2.Controls.Add(editorScroll);
-        tab.Controls.Add(split);
-        return tab;
-    }
-
-    private TabPage BuildAdvancedTab()
-    {
-        var tab = NewTab("Advanced Color");
-        var root = NewScrollingColumn();
-
-        var card = NewCard(1120, 390);
-        card.Controls.Add(new Label
-        {
-            Text = "ADVANCED OUTPUT CONTROL",
-            AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 14f, FontStyle.Bold),
-            ForeColor = Color.White,
-            Location = new Point(20, 18)
-        });
-        card.Controls.Add(new Label
-        {
-            Text = "Driver-level vibrance plus per-channel gains for stronger subject/background separation.",
-            AutoSize = true,
-            ForeColor = MutedColor,
-            Location = new Point(22, 51)
-        });
-
-        _useNvidiaBox.Text = "Use NVIDIA driver Digital Vibrance when available";
-        _useNvidiaBox.AutoSize = true;
-        _useNvidiaBox.Location = new Point(22, 82);
-        card.Controls.Add(_useNvidiaBox);
-
-        var advancedGrid = new TableLayoutPanel
-        {
-            Location = new Point(18, 120),
-            Size = new Size(1065, 210),
-            ColumnCount = 3,
-            RowCount = 3,
-            BackColor = CardColor
-        };
-        advancedGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
-        advancedGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        advancedGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
-        AddSliderRow(advancedGrid, 0, "Red gain", _redGainTrack, _redGainValue);
-        AddSliderRow(advancedGrid, 1, "Green gain", _greenGainTrack, _greenGainValue);
-        AddSliderRow(advancedGrid, 2, "Blue gain", _blueGainTrack, _blueGainValue);
-        card.Controls.Add(advancedGrid);
-
-        var resetAdvanced = CreateSecondaryButton("RESET RGB GAINS", (_, _) =>
-        {
-            _redGainTrack.Value = 100;
-            _greenGainTrack.Value = 100;
-            _blueGainTrack.Value = 100;
-        });
-        resetAdvanced.Location = new Point(22, 342);
-        card.Controls.Add(resetAdvanced);
-
-        _driverLabel.AutoSize = true;
-        _driverLabel.MaximumSize = new Size(1080, 0);
-        _driverLabel.ForeColor = MutedColor;
-        _driverLabel.Text = _effects.NvidiaStatus;
-
-        var explanation = new Label
-        {
-            AutoSize = true,
-            MaximumSize = new Size(1100, 0),
-            ForeColor = MutedColor,
-            Text = "Vibrance is applied through NVIDIA's display driver on supported systems. Saturation, contrast, brightness, exposure, temperature, tint and RGB gains use a Windows desktop color matrix. If driver vibrance is unavailable, DisplayLift approximates the vibrance slider through that matrix. Gamma and shadow lift use the Windows gamma ramp."
-        };
-
-        root.Controls.Add(card);
-        root.Controls.Add(SectionTitle("BACKEND STATUS"));
-        root.Controls.Add(_driverLabel);
-        root.Controls.Add(explanation);
-        tab.Controls.Add(root);
-        return tab;
-    }
-
-    private TabPage BuildAutomationTab()
-    {
-        var tab = NewTab("Automation & Safety");
-        var root = NewScrollingColumn();
-
-        var settingsCard = NewCard(1120, 250);
-        settingsCard.Controls.Add(new Label
-        {
-            Text = "AUTOMATIC PROFILE SWITCHING",
-            AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 14f, FontStyle.Bold),
-            ForeColor = Color.White,
-            Location = new Point(20, 18)
-        });
-
-        _autoStartBox.Text = "Start DisplayLift with Windows, minimized to tray";
-        _autoStartBox.AutoSize = true;
-        _autoStartBox.Location = new Point(22, 62);
-        settingsCard.Controls.Add(_autoStartBox);
-
-        _restoreInactiveBox.Text = "Restore the original display when no profile matches";
-        _restoreInactiveBox.AutoSize = true;
-        _restoreInactiveBox.Location = new Point(22, 94);
-        settingsCard.Controls.Add(_restoreInactiveBox);
-
-        _minimizeToTrayBox.Text = "Closing or minimizing hides DisplayLift in the system tray";
-        _minimizeToTrayBox.AutoSize = true;
-        _minimizeToTrayBox.Location = new Point(22, 126);
-        settingsCard.Controls.Add(_minimizeToTrayBox);
-
-        var pollLabel = new Label
-        {
-            Text = "Detection interval (milliseconds)",
-            AutoSize = true,
-            ForeColor = MutedColor,
-            Location = new Point(22, 169)
-        };
-        settingsCard.Controls.Add(pollLabel);
-        _pollIntervalBox.Minimum = 150;
-        _pollIntervalBox.Maximum = 3000;
-        _pollIntervalBox.Increment = 50;
-        _pollIntervalBox.Width = 110;
-        _pollIntervalBox.Location = new Point(245, 164);
-        settingsCard.Controls.Add(_pollIntervalBox);
-
-        var resume = CreatePrimaryButton("RESUME AUTOMATIC MODE", (_, _) => ResumeAutomaticProfiles());
-        resume.Location = new Point(22, 205);
-        settingsCard.Controls.Add(resume);
-
-        var rustCard = NewCard(1120, 150);
-        rustCard.Controls.Add(new Label
-        {
-            Text = "RUST DETECTION",
-            AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 13f, FontStyle.Bold),
-            ForeColor = Color.White,
-            Location = new Point(20, 16)
-        });
-        _rustPathLabel.AutoSize = true;
-        _rustPathLabel.MaximumSize = new Size(850, 0);
-        _rustPathLabel.ForeColor = MutedColor;
-        _rustPathLabel.Location = new Point(22, 52);
-        rustCard.Controls.Add(_rustPathLabel);
-        var detect = CreateSecondaryButton("DETECT RUST AGAIN", (_, _) => DetectRustPath());
-        detect.Location = new Point(22, 98);
-        rustCard.Controls.Add(detect);
-
-        var diagnostics = NewCard(1120, 190);
-        diagnostics.Controls.Add(new Label
-        {
-            Text = "STATUS & HOTKEYS",
-            AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 13f, FontStyle.Bold),
-            ForeColor = Color.White,
-            Location = new Point(20, 16)
-        });
-        _foregroundLabel.AutoSize = true;
-        _foregroundLabel.ForeColor = MutedColor;
-        _foregroundLabel.Location = new Point(22, 50);
-        diagnostics.Controls.Add(_foregroundLabel);
-        var hotkeys = new Label
-        {
-            AutoSize = true,
-            MaximumSize = new Size(1040, 0),
-            ForeColor = MutedColor,
-            Location = new Point(22, 78),
-            Text = "Ctrl+Alt+F9 cycles Rust presets  •  Ctrl+Alt+F10 restores original settings  •  Ctrl+Alt+F11 resumes automatic switching"
-        };
-        diagnostics.Controls.Add(hotkeys);
-        var openData = CreateSecondaryButton("OPEN PROFILE DATA", (_, _) => OpenProfileFolder());
-        openData.Location = new Point(22, 124);
-        diagnostics.Controls.Add(openData);
-        var exit = CreateSecondaryButton("EXIT DISPLAYLIFT", (_, _) =>
-        {
-            _allowClose = true;
-            Close();
-        });
-        exit.Location = new Point(190, 124);
-        diagnostics.Controls.Add(exit);
-
-        var safety = new Label
-        {
-            AutoSize = true,
-            MaximumSize = new Size(1100, 0),
-            ForeColor = MutedColor,
-            Text = "Safety boundary: DisplayLift does not inject DLLs, modify Rust files, draw an overlay, read game memory, automate input or bypass Easy Anti-Cheat. It observes only process names and changes external Windows/NVIDIA display settings. This is an independent implementation and is not affiliated with Rust, Facepunch or No Mercy Visual."
-        };
-
-        root.Controls.Add(settingsCard);
-        root.Controls.Add(rustCard);
-        root.Controls.Add(diagnostics);
-        root.Controls.Add(SectionTitle("BOUNDARY"));
-        root.Controls.Add(safety);
-        tab.Controls.Add(root);
-        return tab;
-    }
-
-    private GroupBox BuildSliderCard(string title, (string Name, TrackBar Track, Label Value)[] rows)
-    {
-        var group = new GroupBox
-        {
-            Text = title,
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-            ForeColor = Color.White,
-            BackColor = CardColor,
-            Padding = new Padding(14),
-            Margin = new Padding(0, 0, 12, 0)
-        };
         var grid = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill,
-            AutoSize = true,
             ColumnCount = 3,
-            RowCount = rows.Length,
-            BackColor = CardColor
+            RowCount = 2,
+            Location = new Point(18, 72),
+            Size = new Size(560, 142),
+            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top
         };
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78));
-        for (var index = 0; index < rows.Length; index++)
+        for (var column = 0; column < 3; column++) grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
+        for (var row = 0; row < 2; row++) grid.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+
+        var scenes = new[]
         {
-            AddSliderRow(grid, index, rows[index].Name, rows[index].Track, rows[index].Value);
+            RustScene.Balanced, RustScene.Temperate, RustScene.Desert,
+            RustScene.Snow, RustScene.Coast, RustScene.NightInterior
+        };
+        for (var index = 0; index < scenes.Length; index++)
+        {
+            var scene = scenes[index];
+            var button = NewButton(RustSceneCatalog.GetShortName(scene), secondary: true);
+            button.Dock = DockStyle.Fill;
+            button.Margin = new Padding(4);
+            button.Tag = scene;
+            button.Click += (_, _) => SelectManualScene(scene);
+            _sceneButtons[scene] = button;
+            grid.Controls.Add(button, index % 3, index / 3);
         }
-        group.Controls.Add(grid);
-        return group;
+        card.Controls.Add(grid);
+        card.Resize += (_, _) => grid.Width = card.ClientSize.Width - 36;
+        return card;
     }
 
-    private static void AddSliderRow(TableLayoutPanel grid, int row, string text, TrackBar track, Label value)
+    private Control BuildDetectorCard()
     {
-        grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-        var label = new Label
+        var card = NewCard("DETECTOR DETAILS");
+        _detectorDetailsLabel.Text = "DisplayLift samples six small terrain-focused areas from the Rust monitor. Samples are analyzed in memory and are never saved.";
+        _detectorDetailsLabel.ForeColor = MutedColor;
+        _detectorDetailsLabel.Location = new Point(20, 45);
+        _detectorDetailsLabel.Size = new Size(540, 42);
+        _detectorDetailsLabel.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
+        _detectorDetailsLabel.AutoEllipsis = true;
+
+        _effectDetailsLabel.Text = RustVisualPresets.Create(RustScene.Balanced, _settings).ToCompactString();
+        _effectDetailsLabel.ForeColor = TextColor;
+        _effectDetailsLabel.Location = new Point(20, 96);
+        _effectDetailsLabel.Size = new Size(540, 24);
+        _effectDetailsLabel.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
+        _effectDetailsLabel.AutoEllipsis = true;
+
+        _backendLabel.Text = "Checking display backends...";
+        _backendLabel.ForeColor = MutedColor;
+        _backendLabel.Location = new Point(20, 127);
+        _backendLabel.Size = new Size(540, 40);
+        _backendLabel.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
+        _backendLabel.AutoEllipsis = true;
+
+        card.Controls.Add(_detectorDetailsLabel);
+        card.Controls.Add(_effectDetailsLabel);
+        card.Controls.Add(_backendLabel);
+        return card;
+    }
+
+    private Control BuildTuningCard()
+    {
+        var card = NewCard("GLOBAL TUNING");
+        var table = new TableLayoutPanel
         {
-            Text = text,
-            AutoSize = true,
-            ForeColor = Color.Gainsboro,
-            Anchor = AnchorStyles.Left,
-            Margin = new Padding(2, 0, 8, 0)
+            ColumnCount = 3,
+            RowCount = 4,
+            Location = new Point(16, 42),
+            Size = new Size(400, 215),
+            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top
         };
-        track.Dock = DockStyle.Fill;
-        track.BackColor = CardColor;
-        track.Margin = new Padding(0, 7, 6, 0);
-        value.Anchor = AnchorStyles.Right;
-        grid.Controls.Add(label, 0, row);
-        grid.Controls.Add(track, 1, row);
-        grid.Controls.Add(value, 2, row);
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 105));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 54));
+        for (var row = 0; row < 4; row++) table.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
+
+        AddTuningRow(table, 0, "Color", _colorTrack, _colorValue);
+        AddTuningRow(table, 1, "Brightness", _brightnessTrack, _brightnessValue);
+        AddTuningRow(table, 2, "Contrast", _contrastTrack, _contrastValue);
+        AddTuningRow(table, 3, "Shadows", _shadowTrack, _shadowValue);
+        card.Controls.Add(table);
+        card.Resize += (_, _) => table.Width = card.ClientSize.Width - 32;
+        return card;
+    }
+
+    private Control BuildRustSetupCard()
+    {
+        var card = NewCard("RUST SETUP");
+        _pathLabel.Text = "Searching Steam libraries...";
+        _pathLabel.ForeColor = MutedColor;
+        _pathLabel.Location = new Point(20, 45);
+        _pathLabel.Size = new Size(370, 48);
+        _pathLabel.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
+        _pathLabel.AutoEllipsis = true;
+
+        var find = NewButton("FIND RUST", secondary: false);
+        find.Location = new Point(20, 106);
+        find.Size = new Size(120, 38);
+        find.Click += (_, _) => FindRust();
+        var browse = NewButton("BROWSE", secondary: true);
+        browse.Location = new Point(148, 106);
+        browse.Size = new Size(112, 38);
+        browse.Click += (_, _) => BrowseForRust();
+        var launch = NewButton("LAUNCH RUST", secondary: true);
+        launch.Location = new Point(268, 106);
+        launch.Size = new Size(126, 38);
+        launch.Click += (_, _) => LaunchRust();
+
+        card.Controls.Add(_pathLabel);
+        card.Controls.Add(find);
+        card.Controls.Add(browse);
+        card.Controls.Add(launch);
+        return card;
+    }
+
+    private Control BuildBehaviorCard()
+    {
+        var card = NewCard("BEHAVIOR");
+        ConfigureCheck(_nvidiaCheck, "Use NVIDIA driver vibrance when available", 20, 45);
+        ConfigureCheck(_restoreCheck, "Restore desktop colors when Rust loses focus", 20, 76);
+        ConfigureCheck(_startupCheck, "Start DisplayLift with Windows", 20, 107);
+        ConfigureCheck(_trayCheck, "Minimize to the system tray", 20, 138);
+        card.Controls.Add(_nvidiaCheck);
+        card.Controls.Add(_restoreCheck);
+        card.Controls.Add(_startupCheck);
+        card.Controls.Add(_trayCheck);
+        return card;
+    }
+
+    private Control BuildFooter()
+    {
+        var footer = new Panel { Dock = DockStyle.Fill, BackColor = HeaderColor };
+        _footerStatusLabel.Text = "Ctrl+Alt+F8 Auto  •  Ctrl+Alt+F9 Cycle region  •  Ctrl+Alt+F10 Restore";
+        _footerStatusLabel.ForeColor = MutedColor;
+        _footerStatusLabel.AutoSize = true;
+        _footerStatusLabel.Location = new Point(20, 9);
+        footer.Controls.Add(_footerStatusLabel);
+        return footer;
     }
 
     private void HookEvents()
     {
-        foreach (var track in GetAllTracks())
+        _autoToggle.CheckedChanged += (_, _) =>
         {
-            track.ValueChanged += (_, _) =>
+            if (_syncingControls) return;
+            _settings.AutoDetectScene = _autoToggle.Checked;
+            if (_settings.AutoDetectScene)
             {
-                UpdateValueLabels();
-                if (!_loadingEditor && _livePreviewBox.Checked)
-                {
-                    _previewTimer.Stop();
-                    _previewTimer.Start();
-                }
-            };
-        }
-
-        _profileList.SelectedIndexChanged += (_, _) =>
-        {
-            if (!_syncingSelection)
-            {
-                SelectProfile(_profileList.SelectedItem as DisplayProfile);
+                _suspended = false;
+                _stabilizer.Reset(_activeScene ?? RustScene.Balanced);
             }
-        };
-        _profileSelector.SelectedIndexChanged += (_, _) =>
-        {
-            if (!_syncingSelection)
-            {
-                SelectProfile(_profileSelector.SelectedItem as DisplayProfile);
-            }
+            SaveSettings();
+            UpdateAutoToggleAppearance();
+            UpdateSceneButtons();
+            EvaluateRustState();
         };
 
-        _autoStartBox.CheckedChanged += (_, _) =>
+        _colorTrack.ValueChanged += (_, _) => { if (!_syncingControls) { _settings.ColorStrengthPercent = _colorTrack.Value; TuningChanged(); } };
+        _brightnessTrack.ValueChanged += (_, _) => { if (!_syncingControls) { _settings.BrightnessTrimPercent = _brightnessTrack.Value; TuningChanged(); } };
+        _contrastTrack.ValueChanged += (_, _) => { if (!_syncingControls) { _settings.ContrastStrengthPercent = _contrastTrack.Value; TuningChanged(); } };
+        _shadowTrack.ValueChanged += (_, _) => { if (!_syncingControls) { _settings.ShadowAssistPercent = _shadowTrack.Value; TuningChanged(); } };
+
+        _nvidiaCheck.CheckedChanged += (_, _) =>
         {
-            if (_loadingEditor) return;
+            if (_syncingControls) return;
+            _settings.UseNvidiaVibrance = _nvidiaCheck.Checked;
+            SaveSettings();
+            ScheduleReapply();
+        };
+        _restoreCheck.CheckedChanged += (_, _) => { if (!_syncingControls) { _settings.RestoreWhenRustInactive = _restoreCheck.Checked; SaveSettings(); } };
+        _trayCheck.CheckedChanged += (_, _) => { if (!_syncingControls) { _settings.MinimizeToTray = _trayCheck.Checked; SaveSettings(); } };
+        _startupCheck.CheckedChanged += (_, _) =>
+        {
+            if (_syncingControls) return;
             try
             {
-                StartupManager.SetEnabled(_autoStartBox.Checked);
+                StartupManager.SetEnabled(_startupCheck.Checked);
+                _settings.StartWithWindows = _startupCheck.Checked;
+                SaveSettings();
             }
             catch (Exception exception)
             {
-                MessageBox.Show(exception.Message, "DisplayLift startup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(exception.Message, "Startup setting", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _syncingControls = true;
+                _startupCheck.Checked = StartupManager.IsEnabled();
+                _syncingControls = false;
             }
         };
-        _restoreInactiveBox.CheckedChanged += (_, _) =>
-        {
-            if (_loadingEditor) return;
-            _configuration.RestoreWhenNoProfile = _restoreInactiveBox.Checked;
-            SaveConfiguration(false);
-        };
-        _minimizeToTrayBox.CheckedChanged += (_, _) =>
-        {
-            if (_loadingEditor) return;
-            _configuration.MinimizeToTray = _minimizeToTrayBox.Checked;
-            SaveConfiguration(false);
-        };
-        _pollIntervalBox.ValueChanged += (_, _) =>
-        {
-            if (_loadingEditor) return;
-            _configuration.PollIntervalMilliseconds = (int)_pollIntervalBox.Value;
-            _profileTimer.Interval = _configuration.PollIntervalMilliseconds;
-            SaveConfiguration(false);
-        };
     }
 
-    private IEnumerable<TrackBar> GetAllTracks()
+    private void LoadSettingsIntoControls()
     {
-        yield return _saturationTrack;
-        yield return _vibranceTrack;
-        yield return _brightnessTrack;
-        yield return _contrastTrack;
-        yield return _exposureTrack;
-        yield return _gammaTrack;
-        yield return _shadowTrack;
-        yield return _temperatureTrack;
-        yield return _tintTrack;
-        yield return _redGainTrack;
-        yield return _greenGainTrack;
-        yield return _blueGainTrack;
+        _syncingControls = true;
+        _autoToggle.Checked = _settings.AutoDetectScene;
+        _colorTrack.Value = _settings.ColorStrengthPercent;
+        _brightnessTrack.Value = _settings.BrightnessTrimPercent;
+        _contrastTrack.Value = _settings.ContrastStrengthPercent;
+        _shadowTrack.Value = _settings.ShadowAssistPercent;
+        _nvidiaCheck.Checked = _settings.UseNvidiaVibrance;
+        _restoreCheck.Checked = _settings.RestoreWhenRustInactive;
+        _startupCheck.Checked = StartupManager.IsEnabled();
+        _trayCheck.Checked = _settings.MinimizeToTray;
+        _syncingControls = false;
+        UpdateAutoToggleAppearance();
     }
 
-    private void RefreshProfileControls(Guid? selectId = null)
+    private void EvaluateRustState()
     {
-        selectId ??= _editingProfile?.Id ?? _configuration.LastSelectedProfileId;
-        _syncingSelection = true;
+        if (_shutdown) return;
+        var foreground = ForegroundProcess.GetInfo();
+        var rustForeground = ForegroundProcess.IsRust(foreground.ProcessName);
+        var rustRunning = rustForeground || ForegroundProcess.IsRustRunning();
+
+        if (!rustForeground)
+        {
+            _rustStateLabel.Text = rustRunning ? "RUST RUNNING — ALT-TABBED" : "WAITING FOR RUST";
+            _rustStateLabel.ForeColor = rustRunning ? WarningColor : MutedColor;
+            _confidenceLabel.Text = _settings.AutoDetectScene ? "Auto detection starts when Rust is foreground" : $"Manual: {RustSceneCatalog.GetName(_settings.ManualScene)}";
+            _confidenceBar.Value = 0;
+            if (_effectsApplied && _settings.RestoreWhenRustInactive) RestoreOriginal(null, suspend: false);
+            return;
+        }
+
+        _rustStateLabel.Text = "RUST ACTIVE";
+        _rustStateLabel.ForeColor = GoodColor;
+
+        if (_suspended)
+        {
+            _sceneLabel.Text = "Paused";
+            _sceneDescriptionLabel.Text = "Original desktop colors are active. Turn Auto on or choose a manual region to resume.";
+            _confidenceLabel.Text = "Visual changes paused";
+            _confidenceBar.Value = 0;
+            return;
+        }
+
+        if (!_settings.AutoDetectScene)
+        {
+            _sceneLabel.Text = RustSceneCatalog.GetName(_settings.ManualScene);
+            _sceneDescriptionLabel.Text = RustSceneCatalog.GetDescription(_settings.ManualScene);
+            _confidenceLabel.Text = "Manual region selected";
+            _confidenceBar.Value = 100;
+            if (!_effectsApplied || _activeScene != _settings.ManualScene) ApplyScene(_settings.ManualScene, "Manual region");
+            return;
+        }
+
         try
         {
-            _profileList.Items.Clear();
-            _profileSelector.Items.Clear();
-            foreach (var profile in _configuration.Profiles)
-            {
-                _profileList.Items.Add(profile);
-                _profileSelector.Items.Add(profile);
-            }
+            var analysis = _detector.Analyze(foreground.ScreenBounds);
+            var stabilized = _stabilizer.Update(analysis, _settings.DetectionSensitivityPercent);
+            _sceneLabel.Text = RustSceneCatalog.GetName(stabilized.Scene);
+            _sceneDescriptionLabel.Text = RustSceneCatalog.GetDescription(stabilized.Scene);
+            _confidenceLabel.Text = $"{stabilized.Confidence:P0} confidence  •  {stabilized.Status}";
+            _confidenceBar.Value = Math.Clamp((int)Math.Round(stabilized.Confidence * 100), 0, 100);
+            _detectorDetailsLabel.Text = analysis.Summary;
 
-            var selected = _configuration.Profiles.FirstOrDefault(profile => profile.Id == selectId)
-                ?? _configuration.Profiles.FirstOrDefault();
-            if (selected is not null)
-            {
-                _profileList.SelectedItem = selected;
-                _profileSelector.SelectedItem = selected;
-            }
+            if (!_effectsApplied || _activeScene != stabilized.Scene || stabilized.Changed)
+                ApplyScene(stabilized.Scene, "Auto region");
         }
-        finally
+        catch (Exception exception)
         {
-            _syncingSelection = false;
-        }
-
-        SelectProfile(_profileList.SelectedItem as DisplayProfile);
-    }
-
-    private void SelectProfile(DisplayProfile? profile)
-    {
-        if (profile is null) return;
-
-        if (_editingProfile is not null && !_loadingEditor && _editingProfile.Id != profile.Id)
-        {
-            CaptureEditor(_editingProfile);
-        }
-
-        _editingProfile = profile;
-        _configuration.LastSelectedProfileId = profile.Id;
-        _syncingSelection = true;
-        try
-        {
-            _profileList.SelectedItem = profile;
-            _profileSelector.SelectedItem = profile;
-        }
-        finally
-        {
-            _syncingSelection = false;
-        }
-        LoadEditor(profile);
-        SaveConfiguration(false);
-    }
-
-    private void LoadEditor(DisplayProfile profile)
-    {
-        _loadingEditor = true;
-        try
-        {
-            _nameBox.Text = profile.Name;
-            _processBox.Text = profile.ProcessName;
-            _pathBox.Text = profile.ExecutablePath;
-            _triggerBox.SelectedItem = profile.Trigger;
-            _priorityBox.Value = Math.Clamp(profile.Priority, 0, 999);
-            _enabledBox.Checked = profile.Enabled;
-            _restoreOnDeactivateBox.Checked = profile.RestoreOnDeactivate;
-            _useNvidiaBox.Checked = profile.UseNvidiaVibrance;
-
-            _saturationTrack.Value = Math.Clamp(profile.SaturationPercent, _saturationTrack.Minimum, _saturationTrack.Maximum);
-            _vibranceTrack.Value = Math.Clamp(profile.VibrancePercent, _vibranceTrack.Minimum, _vibranceTrack.Maximum);
-            _brightnessTrack.Value = Math.Clamp(profile.BrightnessPercent, _brightnessTrack.Minimum, _brightnessTrack.Maximum);
-            _contrastTrack.Value = Math.Clamp(profile.ContrastPercent, _contrastTrack.Minimum, _contrastTrack.Maximum);
-            _exposureTrack.Value = Math.Clamp(profile.ExposureHundredths, _exposureTrack.Minimum, _exposureTrack.Maximum);
-            _gammaTrack.Value = Math.Clamp(profile.GammaPercent, _gammaTrack.Minimum, _gammaTrack.Maximum);
-            _shadowTrack.Value = Math.Clamp(profile.ShadowLiftPercent, _shadowTrack.Minimum, _shadowTrack.Maximum);
-            _temperatureTrack.Value = Math.Clamp(profile.Temperature, _temperatureTrack.Minimum, _temperatureTrack.Maximum);
-            _tintTrack.Value = Math.Clamp(profile.Tint, _tintTrack.Minimum, _tintTrack.Maximum);
-            _redGainTrack.Value = Math.Clamp(profile.RedGainPercent, _redGainTrack.Minimum, _redGainTrack.Maximum);
-            _greenGainTrack.Value = Math.Clamp(profile.GreenGainPercent, _greenGainTrack.Minimum, _greenGainTrack.Maximum);
-            _blueGainTrack.Value = Math.Clamp(profile.BlueGainPercent, _blueGainTrack.Minimum, _blueGainTrack.Maximum);
-
-            _selectedProfileLabel.Text = $"Preset: {RustPresetCatalog.GetName(profile.LastPreset)}";
-            _presetDescriptionLabel.Text = RustPresetCatalog.GetDescription(profile.LastPreset);
-            UpdateValueLabels();
-        }
-        finally
-        {
-            _loadingEditor = false;
+            _confidenceLabel.Text = "Auto capture unavailable — choose a region below";
+            _confidenceBar.Value = 0;
+            _detectorDetailsLabel.Text = exception.Message;
+            _rustStateLabel.ForeColor = WarningColor;
+            if (!_effectsApplied) ApplyScene(RustScene.Balanced, "Balanced fallback");
         }
     }
 
-    private void CaptureEditor(DisplayProfile profile)
+    private void ApplyScene(RustScene scene, string source)
     {
-        profile.Name = _nameBox.Text;
-        profile.ProcessName = _processBox.Text;
-        profile.ExecutablePath = _pathBox.Text.Trim();
-        profile.Trigger = _triggerBox.SelectedItem is ProfileTrigger trigger ? trigger : ProfileTrigger.Foreground;
-        profile.Priority = (int)_priorityBox.Value;
-        profile.Enabled = _enabledBox.Checked;
-        profile.RestoreOnDeactivate = _restoreOnDeactivateBox.Checked;
-        profile.UseNvidiaVibrance = _useNvidiaBox.Checked;
-        ReadVisualControls(profile);
-        profile.Validate();
+        var visual = RustVisualPresets.Create(scene, _settings);
+        var result = _effects.Apply(visual);
+        _activeScene = scene;
+        _effectsApplied = result.Applied;
+        _effectDetailsLabel.Text = visual.ToCompactString();
+        _footerStatusLabel.Text = result.Applied
+            ? $"{source}: {RustSceneCatalog.GetName(scene)}  •  {result.Message}"
+            : result.Message;
+        _footerStatusLabel.ForeColor = result.Applied ? GoodColor : WarningColor;
+        UpdateSceneButtons();
     }
 
-    private void ReadVisualControls(DisplayProfile profile)
+    private void RestoreOriginal(string? message, bool suspend = false)
     {
-        profile.SaturationPercent = _saturationTrack.Value;
-        profile.VibrancePercent = _vibranceTrack.Value;
-        profile.BrightnessPercent = _brightnessTrack.Value;
-        profile.ContrastPercent = _contrastTrack.Value;
-        profile.ExposureHundredths = _exposureTrack.Value;
-        profile.GammaPercent = _gammaTrack.Value;
-        profile.ShadowLiftPercent = _shadowTrack.Value;
-        profile.Temperature = _temperatureTrack.Value;
-        profile.Tint = _tintTrack.Value;
-        profile.RedGainPercent = _redGainTrack.Value;
-        profile.GreenGainPercent = _greenGainTrack.Value;
-        profile.BlueGainPercent = _blueGainTrack.Value;
-    }
-
-    private void SaveSelectedProfile()
-    {
-        if (_editingProfile is null) return;
-        CaptureEditor(_editingProfile);
-        SaveConfiguration(true);
-        RefreshProfileControls(_editingProfile.Id);
-        UpdateStatus($"Saved profile '{_editingProfile.Name}'.", SuccessColor);
-    }
-
-    private void SaveAndApplySelectedProfile()
-    {
-        if (_editingProfile is null) return;
-        CaptureEditor(_editingProfile);
-        SaveConfiguration(true);
-        _manualMode = true;
-        _activeProfileId = _editingProfile.Id;
-        var result = _effects.Apply(_editingProfile);
-        UpdateStatus(result.Message, result.Applied ? SuccessColor : Color.IndianRed);
-        UpdateModeLabel();
-    }
-
-    private void PreviewCurrentSettings()
-    {
-        if (_editingProfile is null || _loadingEditor) return;
-        var preview = _editingProfile.Clone(_editingProfile.Name);
-        preview.UseNvidiaVibrance = _useNvidiaBox.Checked;
-        ReadVisualControls(preview);
-        _manualMode = true;
-        _activeProfileId = _editingProfile.Id;
-        var result = _effects.Apply(preview);
-        UpdateStatus(result.Message, result.Applied ? SuccessColor : Color.IndianRed);
-        UpdateModeLabel();
-    }
-
-    private void ApplyPreset(RustVisualPreset preset)
-    {
-        var rust = GetRustProfile() ?? _editingProfile;
-        if (rust is null) return;
-        SelectProfile(rust);
-        rust.ApplyPreset(preset);
-        LoadEditor(rust);
-        SaveConfiguration(false);
-        _manualMode = true;
-        _activeProfileId = rust.Id;
-        var result = _effects.Apply(rust);
-        UpdateStatus($"{RustPresetCatalog.GetName(preset)}: {result.Message}", result.Applied ? SuccessColor : Color.IndianRed);
-        UpdateModeLabel();
-    }
-
-    private void CycleRustPreset()
-    {
-        var rust = GetRustProfile();
-        if (rust is null) return;
-        var sequence = new[]
-        {
-            RustVisualPreset.CleanRust,
-            RustVisualPreset.Summer,
-            RustVisualPreset.Winter,
-            RustVisualPreset.Desert,
-            RustVisualPreset.Night,
-            RustVisualPreset.Competitive,
-            RustVisualPreset.MaximumColor
-        };
-        var index = Array.IndexOf(sequence, rust.LastPreset);
-        var next = sequence[(index + 1 + sequence.Length) % sequence.Length];
-        ApplyPreset(next);
-    }
-
-    private void RestoreOriginal(bool showMessage)
-    {
-        _manualMode = true;
-        _activeProfileId = null;
         var result = _effects.Restore();
-        UpdateStatus(result.Message, result.Applied ? SuccessColor : Color.IndianRed);
-        UpdateModeLabel();
-        if (showMessage && !result.Applied)
+        _effectsApplied = false;
+        _activeScene = null;
+        if (suspend) _suspended = true;
+        _footerStatusLabel.Text = message ?? result.Message;
+        _footerStatusLabel.ForeColor = MutedColor;
+        UpdateSceneButtons();
+    }
+
+    private void EnableAutoMode()
+    {
+        _suspended = false;
+        _syncingControls = true;
+        _autoToggle.Checked = true;
+        _syncingControls = false;
+        _settings.AutoDetectScene = true;
+        _stabilizer.Reset(_activeScene ?? RustScene.Balanced);
+        SaveSettings();
+        UpdateAutoToggleAppearance();
+        UpdateSceneButtons();
+        EvaluateRustState();
+    }
+
+    private void SelectManualScene(RustScene scene)
+    {
+        _suspended = false;
+        _syncingControls = true;
+        _autoToggle.Checked = false;
+        _syncingControls = false;
+        _settings.AutoDetectScene = false;
+        _settings.ManualScene = scene;
+        SaveSettings();
+        UpdateAutoToggleAppearance();
+        UpdateSceneButtons();
+        if (ForegroundProcess.IsRust(ForegroundProcess.GetInfo().ProcessName)) ApplyScene(scene, "Manual region");
+        else
         {
-            MessageBox.Show(result.Message, "DisplayLift restore", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            _sceneLabel.Text = RustSceneCatalog.GetName(scene);
+            _sceneDescriptionLabel.Text = RustSceneCatalog.GetDescription(scene);
+            _confidenceLabel.Text = "Manual region ready — launch or focus Rust";
+            _effectDetailsLabel.Text = RustVisualPresets.Create(scene, _settings).ToCompactString();
         }
     }
 
-    private void ResumeAutomaticProfiles()
+    private void CycleManualScene()
     {
-        _manualMode = false;
-        _activeProfileId = null;
-        UpdateStatus("Automatic profile switching resumed.", SuccessColor);
-        EvaluateAutomaticProfiles();
+        var scenes = new[] { RustScene.Balanced, RustScene.Temperate, RustScene.Desert, RustScene.Snow, RustScene.Coast, RustScene.NightInterior };
+        var current = _settings.AutoDetectScene ? RustScene.Balanced : _settings.ManualScene;
+        var index = Array.IndexOf(scenes, current);
+        SelectManualScene(scenes[(index + 1) % scenes.Length]);
     }
 
-    private void EvaluateAutomaticProfiles()
+    private void TuningChanged()
     {
-        var foreground = ForegroundProcess.GetName();
-        _foregroundLabel.Text = string.IsNullOrWhiteSpace(foreground)
-            ? "Foreground process: unavailable"
-            : $"Foreground process: {foreground}.exe";
-
-        if (_manualMode)
-        {
-            UpdateModeLabel();
-            return;
-        }
-
-        var running = GetRunningProcessNames();
-        var match = _configuration.Profiles
-            .Where(profile => profile.Enabled && !string.IsNullOrWhiteSpace(profile.ProcessName))
-            .Where(profile => profile.Trigger == ProfileTrigger.Foreground
-                ? string.Equals(profile.ProcessName, foreground, StringComparison.OrdinalIgnoreCase)
-                : running.Contains(profile.ProcessName))
-            .OrderByDescending(profile => profile.Priority)
-            .ThenBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
-
-        if (match is not null)
-        {
-            if (_activeProfileId != match.Id)
-            {
-                var result = _effects.Apply(match);
-                _activeProfileId = match.Id;
-                UpdateStatus($"Auto: {match.Name}. {result.Message}", result.Applied ? SuccessColor : Color.IndianRed);
-            }
-        }
-        else if (_activeProfileId is Guid previousId)
-        {
-            var previous = _configuration.Profiles.FirstOrDefault(profile => profile.Id == previousId);
-            if (_configuration.RestoreWhenNoProfile && (previous?.RestoreOnDeactivate ?? true))
-            {
-                var result = _effects.Restore();
-                UpdateStatus(result.Message, result.Applied ? SuccessColor : Color.IndianRed);
-            }
-            _activeProfileId = null;
-        }
-
-        UpdateModeLabel();
+        UpdateTuningLabels();
+        SaveSettings();
+        var scene = _settings.AutoDetectScene ? (_activeScene ?? RustScene.Balanced) : _settings.ManualScene;
+        _effectDetailsLabel.Text = RustVisualPresets.Create(scene, _settings).ToCompactString();
+        ScheduleReapply();
     }
 
-    private HashSet<string> GetRunningProcessNames()
+    private void ScheduleReapply()
     {
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var process in Process.GetProcesses())
-        {
-            using (process)
-            {
-                try
-                {
-                    result.Add(process.ProcessName);
-                }
-                catch
-                {
-                    // Process exited while enumerating.
-                }
-            }
-        }
-        return result;
+        _reapplyTimer.Stop();
+        _reapplyTimer.Start();
     }
 
-    private void AddBlankProfile()
+    private void UpdateTuningLabels()
     {
-        var profile = new DisplayProfile { Name = "New application profile", Priority = 50 };
-        profile.ApplyPreset(RustVisualPreset.CleanRust);
-        _configuration.Profiles.Add(profile);
-        SaveConfiguration(false);
-        RefreshProfileControls(profile.Id);
-    }
-
-    private void AddRunningProfile()
-    {
-        using var dialog = new ProcessPickerDialog();
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        var profile = new DisplayProfile
-        {
-            Name = dialog.SelectedProcessName,
-            ProcessName = dialog.SelectedProcessName,
-            ExecutablePath = dialog.SelectedExecutablePath,
-            Priority = 50
-        };
-        profile.ApplyPreset(RustVisualPreset.CleanRust);
-        _configuration.Profiles.Add(profile);
-        SaveConfiguration(false);
-        RefreshProfileControls(profile.Id);
-    }
-
-    private void AddProfileFromExecutable()
-    {
-        using var dialog = new OpenFileDialog
-        {
-            Filter = "Applications (*.exe)|*.exe",
-            Title = "Choose an application"
-        };
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        var profile = new DisplayProfile
-        {
-            Name = Path.GetFileNameWithoutExtension(dialog.FileName),
-            ProcessName = Path.GetFileNameWithoutExtension(dialog.FileName),
-            ExecutablePath = dialog.FileName,
-            Priority = 50
-        };
-        profile.ApplyPreset(RustVisualPreset.CleanRust);
-        _configuration.Profiles.Add(profile);
-        SaveConfiguration(false);
-        RefreshProfileControls(profile.Id);
-    }
-
-    private void CloneSelectedProfile()
-    {
-        if (_editingProfile is null) return;
-        CaptureEditor(_editingProfile);
-        var clone = _editingProfile.Clone();
-        _configuration.Profiles.Add(clone);
-        SaveConfiguration(false);
-        RefreshProfileControls(clone.Id);
-    }
-
-    private void DeleteSelectedProfile()
-    {
-        if (_editingProfile is null) return;
-        if (_configuration.Profiles.Count <= 1)
-        {
-            MessageBox.Show("DisplayLift must keep at least one profile.", "Profiles", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
-        }
-        if (MessageBox.Show($"Delete '{_editingProfile.Name}'?", "Delete profile", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-        {
-            return;
-        }
-        var deletedId = _editingProfile.Id;
-        _configuration.Profiles.RemoveAll(profile => profile.Id == deletedId);
-        _editingProfile = null;
-        SaveConfiguration(false);
-        RefreshProfileControls(_configuration.Profiles.FirstOrDefault()?.Id);
-    }
-
-    private void ImportProfile()
-    {
-        using var dialog = new OpenFileDialog
-        {
-            Filter = "DisplayLift profile (*.json)|*.json|All files (*.*)|*.*",
-            Title = "Import DisplayLift profile"
-        };
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        try
-        {
-            var profile = _profileStore.ImportProfile(dialog.FileName);
-            _configuration.Profiles.Add(profile);
-            SaveConfiguration(false);
-            RefreshProfileControls(profile.Id);
-        }
-        catch (Exception exception)
-        {
-            MessageBox.Show(exception.Message, "Import profile", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-    }
-
-    private void ExportProfile()
-    {
-        if (_editingProfile is null) return;
-        CaptureEditor(_editingProfile);
-        using var dialog = new SaveFileDialog
-        {
-            Filter = "DisplayLift profile (*.json)|*.json",
-            FileName = SanitizeFileName(_editingProfile.Name) + ".json",
-            Title = "Export DisplayLift profile"
-        };
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        try
-        {
-            _profileStore.ExportProfile(_editingProfile, dialog.FileName);
-        }
-        catch (Exception exception)
-        {
-            MessageBox.Show(exception.Message, "Export profile", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-    }
-
-    private void BrowsePathForSelectedProfile()
-    {
-        using var dialog = new OpenFileDialog
-        {
-            Filter = "Applications (*.exe)|*.exe",
-            Title = "Choose executable"
-        };
-        if (File.Exists(_pathBox.Text))
-        {
-            dialog.FileName = _pathBox.Text;
-        }
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        _pathBox.Text = dialog.FileName;
-        if (string.IsNullOrWhiteSpace(_processBox.Text))
-        {
-            _processBox.Text = Path.GetFileNameWithoutExtension(dialog.FileName);
-        }
-    }
-
-    private void DetectRustPath()
-    {
-        var path = ProfileStore.FindRustExecutable();
-        var rust = GetRustProfile();
-        if (rust is null) return;
-        rust.ExecutablePath = path;
-        SaveConfiguration(false);
-        LoadRustPathLabel();
-        UpdateStatus(string.IsNullOrWhiteSpace(path) ? "RustClient.exe was not found automatically." : "RustClient.exe detected.", string.IsNullOrWhiteSpace(path) ? Color.Goldenrod : SuccessColor);
-    }
-
-    private DisplayProfile? GetRustProfile() => _configuration.Profiles.FirstOrDefault(profile =>
-        string.Equals(profile.ProcessName, "RustClient", StringComparison.OrdinalIgnoreCase));
-
-    private void LoadSettingsControls()
-    {
-        _loadingEditor = true;
-        try
-        {
-            _autoStartBox.Checked = StartupManager.IsEnabled();
-            _restoreInactiveBox.Checked = _configuration.RestoreWhenNoProfile;
-            _minimizeToTrayBox.Checked = _configuration.MinimizeToTray;
-            _pollIntervalBox.Value = Math.Clamp(_configuration.PollIntervalMilliseconds, 150, 3000);
-            LoadRustPathLabel();
-        }
-        finally
-        {
-            _loadingEditor = false;
-        }
-    }
-
-    private void LoadRustPathLabel()
-    {
-        var path = GetRustProfile()?.ExecutablePath;
-        _rustPathLabel.Text = string.IsNullOrWhiteSpace(path)
-            ? "RustClient.exe was not found automatically. The process-name trigger still works after Rust launches."
-            : $"Detected: {path}";
-    }
-
-    private void SaveConfiguration(bool showErrors)
-    {
-        try
-        {
-            _profileStore.Save(_configuration);
-        }
-        catch (Exception exception)
-        {
-            if (showErrors)
-            {
-                MessageBox.Show(exception.Message, "Save profiles", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-    }
-
-    private void OpenProfileFolder()
-    {
-        Directory.CreateDirectory(_profileStore.DirectoryPath);
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = _profileStore.DirectoryPath,
-            UseShellExecute = true
-        });
-    }
-
-    private void UpdateValueLabels()
-    {
-        _saturationValue.Text = (_saturationTrack.Value / 100.0).ToString("0.00");
-        _vibranceValue.Text = FormatSignedDecimal(_vibranceTrack.Value / 100.0);
-        _brightnessValue.Text = FormatSignedDecimal(_brightnessTrack.Value / 100.0);
-        _contrastValue.Text = (_contrastTrack.Value / 100.0).ToString("0.00");
-        _exposureValue.Text = $"{FormatSignedDecimal(_exposureTrack.Value / 100.0)} EV";
-        _gammaValue.Text = (_gammaTrack.Value / 100.0).ToString("0.00");
+        _colorValue.Text = $"{_colorTrack.Value}%";
+        _brightnessValue.Text = _brightnessTrack.Value == 0 ? "0" : $"{_brightnessTrack.Value:+#;-#}%";
+        _contrastValue.Text = $"{_contrastTrack.Value}%";
         _shadowValue.Text = $"{_shadowTrack.Value}%";
-        _temperatureValue.Text = FormatSignedInteger(_temperatureTrack.Value);
-        _tintValue.Text = FormatSignedInteger(_tintTrack.Value);
-        _redGainValue.Text = (_redGainTrack.Value / 100.0).ToString("0.00");
-        _greenGainValue.Text = (_greenGainTrack.Value / 100.0).ToString("0.00");
-        _blueGainValue.Text = (_blueGainTrack.Value / 100.0).ToString("0.00");
     }
 
-    private void UpdateStatus(string message, Color color)
+    private void UpdateAutoToggleAppearance()
     {
-        _engineStatusLabel.Text = color == SuccessColor ? "ENGINE ACTIVE" : "ENGINE NOTICE";
-        _engineStatusLabel.BackColor = color == SuccessColor ? Color.FromArgb(37, 113, 73) : Color.FromArgb(130, 76, 35);
-        _activeModeLabel.Text = message;
-        _activeModeLabel.ForeColor = color;
+        _autoToggle.Text = _settings.AutoDetectScene ? "AUTO ON" : "AUTO OFF";
+        _autoToggle.BackColor = _settings.AutoDetectScene ? AccentColor : CardRaisedColor;
+        _autoToggle.ForeColor = TextColor;
     }
 
-    private void UpdateModeLabel()
+    private void UpdateSceneButtons()
     {
-        var mode = _manualMode ? "Manual preview/apply mode" : "Automatic profile mode";
-        var active = _activeProfileId is Guid id
-            ? _configuration.Profiles.FirstOrDefault(profile => profile.Id == id)?.Name ?? "Unknown profile"
-            : "Original display / no active profile";
-        _selectedProfileLabel.Text = _editingProfile is null
-            ? mode
-            : $"{mode}  •  {RustPresetCatalog.GetName(_editingProfile.LastPreset)}";
-        if (string.IsNullOrWhiteSpace(_activeModeLabel.Text))
+        foreach (var pair in _sceneButtons)
         {
-            _activeModeLabel.Text = $"{mode}. Active: {active}.";
+            var selected = !_settings.AutoDetectScene && pair.Key == _settings.ManualScene;
+            pair.Value.BackColor = selected ? AccentColor : CardRaisedColor;
+            pair.Value.ForeColor = TextColor;
         }
     }
 
-    private NotifyIcon CreateTrayIcon()
+    private void UpdateBackendDisplay()
+    {
+        var colorStatus = _effects.ColorMatrixAvailable ? "Windows color matrix ready" : "Windows color matrix unavailable";
+        _backendLabel.Text = $"{colorStatus}. {_effects.NvidiaStatus}";
+        _backendLabel.ForeColor = _effects.ColorMatrixAvailable ? MutedColor : WarningColor;
+    }
+
+    private void FindRust()
+    {
+        var found = RustLocator.FindExecutable();
+        if (string.IsNullOrWhiteSpace(found))
+        {
+            MessageBox.Show("Rust was not found in the Steam libraries Windows reported. DisplayLift can still detect RustClient.exe when the game runs, or you can browse to it manually.", "Rust not found", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        _settings.RustExecutablePath = found;
+        SaveSettings();
+        UpdateRustPathDisplay();
+    }
+
+    private void BrowseForRust()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Title = "Select RustClient.exe",
+            Filter = "Rust client|RustClient.exe|Executable files|*.exe",
+            CheckFileExists = true,
+            FileName = "RustClient.exe"
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        if (!string.Equals(Path.GetFileName(dialog.FileName), "RustClient.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show("Select RustClient.exe from the Rust installation folder.", "Wrong executable", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        _settings.RustExecutablePath = dialog.FileName;
+        SaveSettings();
+        UpdateRustPathDisplay();
+    }
+
+    private void LaunchRust()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_settings.RustExecutablePath) && File.Exists(_settings.RustExecutablePath))
+            {
+                Process.Start(new ProcessStartInfo(_settings.RustExecutablePath) { UseShellExecute = true });
+                return;
+            }
+            Process.Start(new ProcessStartInfo("steam://rungameid/252490") { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Could not launch Rust", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void UpdateRustPathDisplay()
+    {
+        _pathLabel.Text = string.IsNullOrWhiteSpace(_settings.RustExecutablePath)
+            ? "RustClient.exe will be detected by process name. Use Find Rust only for the launch button."
+            : $"RustClient.exe\n{_settings.RustExecutablePath}";
+        _pathLabel.ForeColor = string.IsNullOrWhiteSpace(_settings.RustExecutablePath) ? WarningColor : MutedColor;
+    }
+
+    private void SaveSettings()
+    {
+        try { _store.Save(_settings); }
+        catch (Exception exception) { _footerStatusLabel.Text = $"Could not save settings: {exception.Message}"; _footerStatusLabel.ForeColor = WarningColor; }
+    }
+
+    private NotifyIcon BuildTrayIcon()
     {
         var menu = new ContextMenuStrip();
         menu.Items.Add("Open DisplayLift", null, (_, _) => ShowFromTray());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Clean Rust", null, (_, _) => ApplyPreset(RustVisualPreset.CleanRust));
-        menu.Items.Add("Competitive", null, (_, _) => ApplyPreset(RustVisualPreset.Competitive));
-        menu.Items.Add("Night", null, (_, _) => ApplyPreset(RustVisualPreset.Night));
-        menu.Items.Add("Maximum Color", null, (_, _) => ApplyPreset(RustVisualPreset.MaximumColor));
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Restore original", null, (_, _) => RestoreOriginal(showMessage: false));
-        menu.Items.Add("Resume automatic", null, (_, _) => ResumeAutomaticProfiles());
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Exit", null, (_, _) =>
+        menu.Items.Add("Auto region", null, (_, _) => EnableAutoMode());
+        foreach (var scene in new[] { RustScene.Balanced, RustScene.Temperate, RustScene.Desert, RustScene.Snow, RustScene.Coast, RustScene.NightInterior })
         {
-            _allowClose = true;
-            Close();
-        });
+            var captured = scene;
+            menu.Items.Add(RustSceneCatalog.GetName(scene), null, (_, _) => SelectManualScene(captured));
+        }
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Restore original", null, (_, _) => RestoreOriginal("Original display settings restored — automatic changes paused", suspend: true));
+        menu.Items.Add("Exit", null, (_, _) => ExitApplication());
 
         var icon = new NotifyIcon
         {
-            Text = "DisplayLift Visual Panel",
+            Text = "DisplayLift Rust Auto Visuals",
             Icon = SystemIcons.Application,
-            ContextMenuStrip = menu,
-            Visible = true
+            Visible = true,
+            ContextMenuStrip = menu
         };
         icon.DoubleClick += (_, _) => ShowFromTray();
         return icon;
     }
 
+    private void RegisterGlobalHotkeys()
+    {
+        _ = RegisterHotKey(Handle, AutoHotkeyId, ModControl | ModAlt, (uint)Keys.F8);
+        _ = RegisterHotKey(Handle, CycleHotkeyId, ModControl | ModAlt, (uint)Keys.F9);
+        _ = RegisterHotKey(Handle, RestoreHotkeyId, ModControl | ModAlt, (uint)Keys.F10);
+    }
+
     private void HideToTray()
     {
         Hide();
+        ShowInTaskbar = false;
         WindowState = FormWindowState.Normal;
-        _trayIcon.Visible = true;
     }
 
     private void ShowFromTray()
     {
+        ShowInTaskbar = true;
         Show();
         WindowState = FormWindowState.Normal;
         Activate();
@@ -1375,7 +776,7 @@ internal sealed class MainForm : Form
 
     private void HandleFormClosing(object? sender, FormClosingEventArgs eventArgs)
     {
-        if (!_allowClose && eventArgs.CloseReason == CloseReason.UserClosing && _configuration.MinimizeToTray)
+        if (!_allowClose && eventArgs.CloseReason == CloseReason.UserClosing && _settings.MinimizeToTray)
         {
             eventArgs.Cancel = true;
             HideToTray();
@@ -1384,85 +785,76 @@ internal sealed class MainForm : Form
         Shutdown();
     }
 
+    private void ExitApplication()
+    {
+        _allowClose = true;
+        Close();
+    }
+
     private void Shutdown()
     {
         if (_shutdown) return;
         _shutdown = true;
-        SaveConfiguration(false);
-        _profileTimer.Stop();
-        _previewTimer.Stop();
-        UnregisterGlobalHotkeys();
+        _monitorTimer.Stop();
+        _reapplyTimer.Stop();
+        _ = UnregisterHotKey(Handle, AutoHotkeyId);
+        _ = UnregisterHotKey(Handle, CycleHotkeyId);
+        _ = UnregisterHotKey(Handle, RestoreHotkeyId);
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
+        _detector.Dispose();
         _effects.Dispose();
     }
 
-    private void RegisterGlobalHotkeys()
+    private static Panel NewCard(string title)
     {
-        _ = RegisterHotKey(Handle, CycleHotkeyId, ModControl | ModAlt, (uint)Keys.F9);
-        _ = RegisterHotKey(Handle, RestoreHotkeyId, ModControl | ModAlt, (uint)Keys.F10);
-        _ = RegisterHotKey(Handle, AutoHotkeyId, ModControl | ModAlt, (uint)Keys.F11);
-    }
-
-    private void UnregisterGlobalHotkeys()
-    {
-        if (!IsHandleCreated) return;
-        _ = UnregisterHotKey(Handle, CycleHotkeyId);
-        _ = UnregisterHotKey(Handle, RestoreHotkeyId);
-        _ = UnregisterHotKey(Handle, AutoHotkeyId);
-    }
-
-    private void DrawTab(object? sender, DrawItemEventArgs eventArgs)
-    {
-        var selected = eventArgs.Index == _tabs.SelectedIndex;
-        var bounds = eventArgs.Bounds;
-        using var background = new SolidBrush(selected ? CardColor : PanelColor);
-        using var textBrush = new SolidBrush(selected ? Color.White : MutedColor);
-        eventArgs.Graphics.FillRectangle(background, bounds);
-        var text = _tabs.TabPages[eventArgs.Index].Text;
-        TextRenderer.DrawText(eventArgs.Graphics, text, Font, bounds, textBrush.Color,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-        if (selected)
+        var card = new Panel
         {
-            using var accent = new SolidBrush(AccentColor);
-            eventArgs.Graphics.FillRectangle(accent, bounds.Left + 12, bounds.Bottom - 4, bounds.Width - 24, 4);
-        }
+            Dock = DockStyle.Fill,
+            BackColor = CardColor,
+            Margin = new Padding(0, 0, 0, 12),
+            Padding = new Padding(1)
+        };
+        card.Paint += (_, eventArgs) =>
+        {
+            using var pen = new Pen(BorderColor);
+            eventArgs.Graphics.DrawRectangle(pen, 0, 0, card.ClientSize.Width - 1, card.ClientSize.Height - 1);
+        };
+        card.Controls.Add(new Label
+        {
+            Text = title,
+            ForeColor = MutedColor,
+            Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold),
+            AutoSize = true,
+            Location = new Point(20, 17)
+        });
+        return card;
     }
 
-    private static TabPage NewTab(string text) => new()
+    private static Button NewButton(string text, bool secondary)
     {
-        Text = text,
-        BackColor = WindowColor,
-        ForeColor = Color.White,
-        Padding = new Padding(0)
-    };
-
-    private static FlowLayoutPanel NewScrollingColumn() => new()
-    {
-        Dock = DockStyle.Fill,
-        AutoScroll = true,
-        FlowDirection = FlowDirection.TopDown,
-        WrapContents = false,
-        Padding = new Padding(24, 20, 24, 28),
-        BackColor = WindowColor
-    };
-
-    private static Panel NewCard(int width, int height) => new()
-    {
-        Width = width,
-        Height = height,
-        BackColor = CardColor,
-        Margin = new Padding(0, 0, 0, 14)
-    };
-
-    private static Label SectionTitle(string text) => new()
-    {
-        Text = text,
-        AutoSize = true,
-        ForeColor = MutedColor,
-        Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold),
-        Margin = new Padding(2, 8, 0, 8)
-    };
+        var button = new Button
+        {
+            Text = text,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = secondary ? CardRaisedColor : AccentColor,
+            ForeColor = TextColor,
+            Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+            UseVisualStyleBackColor = false
+        };
+        button.FlatAppearance.BorderSize = secondary ? 1 : 0;
+        button.FlatAppearance.BorderColor = BorderColor;
+        button.MouseEnter += (_, _) => { if (button.Enabled) button.BackColor = AccentHoverColor; };
+        button.MouseLeave += (_, _) =>
+        {
+            if (button.Tag is RustScene scene && button.FindForm() is MainForm form && !form._settings.AutoDetectScene && form._settings.ManualScene == scene)
+                button.BackColor = AccentColor;
+            else
+                button.BackColor = secondary ? CardRaisedColor : AccentColor;
+        };
+        return button;
+    }
 
     private static TrackBar CreateTrackBar(int minimum, int maximum, int value, int tickFrequency) => new()
     {
@@ -1470,126 +862,40 @@ internal sealed class MainForm : Form
         Maximum = maximum,
         Value = value,
         TickFrequency = tickFrequency,
-        AutoSize = false,
-        Height = 38
+        TickStyle = TickStyle.None,
+        Dock = DockStyle.Fill,
+        Margin = new Padding(5, 10, 5, 5)
     };
 
-    private static Label CreateValueLabel() => new()
+    private static Label NewValueLabel() => new()
     {
-        AutoSize = true,
-        ForeColor = AccentColor,
-        Font = new Font("Consolas", 10f, FontStyle.Bold),
-        TextAlign = ContentAlignment.MiddleRight
+        ForeColor = TextColor,
+        TextAlign = ContentAlignment.MiddleRight,
+        Dock = DockStyle.Fill,
+        Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold)
     };
 
-    private static Button CreatePrimaryButton(string text, EventHandler handler)
+    private static void AddTuningRow(TableLayoutPanel table, int row, string label, TrackBar track, Label value)
     {
-        var button = new Button
+        table.Controls.Add(new Label
         {
-            Text = text,
-            AutoSize = true,
-            MinimumSize = new Size(118, 36),
-            FlatStyle = FlatStyle.Flat,
-            BackColor = AccentColor,
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold),
-            Cursor = Cursors.Hand,
-            Margin = new Padding(0, 0, 8, 8)
-        };
-        button.FlatAppearance.BorderSize = 0;
-        button.FlatAppearance.MouseOverBackColor = AccentHoverColor;
-        button.Click += handler;
-        return button;
-    }
-
-    private static Button CreateSecondaryButton(string text, EventHandler handler)
-    {
-        var button = new Button
-        {
-            Text = text,
-            AutoSize = true,
-            MinimumSize = new Size(105, 36),
-            FlatStyle = FlatStyle.Flat,
-            BackColor = InputColor,
-            ForeColor = Color.WhiteSmoke,
-            Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold),
-            Cursor = Cursors.Hand,
-            Margin = new Padding(0, 0, 8, 8)
-        };
-        button.FlatAppearance.BorderColor = Color.FromArgb(70, 76, 82);
-        button.FlatAppearance.BorderSize = 1;
-        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(52, 57, 62);
-        button.Click += handler;
-        return button;
-    }
-
-    private static Button CreatePresetButton(string text, EventHandler handler)
-    {
-        var button = CreateSecondaryButton(text.ToUpperInvariant(), handler);
-        button.MinimumSize = new Size(125, 42);
-        return button;
-    }
-
-    private static void AddEditorRow(TableLayoutPanel grid, int row, string labelText, Control control)
-    {
-        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        var label = new Label
-        {
-            Text = labelText,
-            AutoSize = true,
+            Text = label,
             ForeColor = MutedColor,
-            Anchor = AnchorStyles.Left,
-            Margin = new Padding(0, 8, 10, 14)
-        };
-        control.Dock = control is NumericUpDown ? DockStyle.None : DockStyle.Top;
-        control.Margin = new Padding(0, 2, 0, 12);
-        grid.Controls.Add(label, 0, row);
-        grid.Controls.Add(control, 1, row);
+            TextAlign = ContentAlignment.MiddleLeft,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(4)
+        }, 0, row);
+        table.Controls.Add(track, 1, row);
+        table.Controls.Add(value, 2, row);
     }
 
-    private static void ApplyTheme(Control root)
+    private static void ConfigureCheck(CheckBox checkBox, string text, int x, int y)
     {
-        foreach (Control control in root.Controls)
-        {
-            switch (control)
-            {
-                case TextBox textBox:
-                    textBox.BackColor = InputColor;
-                    textBox.ForeColor = Color.WhiteSmoke;
-                    textBox.BorderStyle = BorderStyle.FixedSingle;
-                    break;
-                case ComboBox comboBox:
-                    comboBox.BackColor = InputColor;
-                    comboBox.ForeColor = Color.WhiteSmoke;
-                    comboBox.FlatStyle = FlatStyle.Flat;
-                    break;
-                case ListBox listBox:
-                    listBox.BackColor = InputColor;
-                    listBox.ForeColor = Color.WhiteSmoke;
-                    listBox.BorderStyle = BorderStyle.FixedSingle;
-                    break;
-                case NumericUpDown numeric:
-                    numeric.BackColor = InputColor;
-                    numeric.ForeColor = Color.WhiteSmoke;
-                    break;
-                case TabControl tabControl:
-                    tabControl.BackColor = WindowColor;
-                    break;
-            }
-            ApplyTheme(control);
-        }
-    }
-
-    private static string FormatSignedDecimal(double value) => value >= 0 ? $"+{value:0.00}" : value.ToString("0.00");
-    private static string FormatSignedInteger(int value) => value >= 0 ? $"+{value}" : value.ToString();
-
-    private static string SanitizeFileName(string value)
-    {
-        foreach (var character in Path.GetInvalidFileNameChars())
-        {
-            value = value.Replace(character, '_');
-        }
-        return string.IsNullOrWhiteSpace(value) ? "DisplayLift-profile" : value;
+        checkBox.Text = text;
+        checkBox.ForeColor = TextColor;
+        checkBox.BackColor = CardColor;
+        checkBox.AutoSize = true;
+        checkBox.Location = new Point(x, y);
     }
 
     [DllImport("user32.dll")]

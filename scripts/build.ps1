@@ -37,14 +37,14 @@ if ($Running.Count -gt 0) {
     Start-Sleep -Milliseconds 500
 }
 
-Write-Host 'Running V7 profile, preset and color-matrix tests...'
+Write-Host 'Running V8 auto-scene, preset and color-matrix tests...'
 dotnet run --project $TestProject --configuration Release
 if ($LASTEXITCODE -ne 0) { throw 'DisplayLift tests failed.' }
 
 if (Test-Path $Dist) { Remove-Item $Dist -Recurse -Force }
 New-Item $Dist -ItemType Directory | Out-Null
 
-Write-Host "Publishing DisplayLift V7 for $Runtime..."
+Write-Host "Publishing DisplayLift V8 for $Runtime..."
 dotnet publish $Project `
     --configuration Release `
     --runtime $Runtime `

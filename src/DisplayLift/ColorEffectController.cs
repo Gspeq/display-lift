@@ -26,7 +26,7 @@ internal sealed class ColorEffectController : IDisposable
 
     public bool Available => _initialized;
 
-    public bool TryApply(DisplayProfile profile, bool approximateVibrance, out string? error)
+    public bool TryApply(VisualSettings profile, bool approximateVibrance, out string? error)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 

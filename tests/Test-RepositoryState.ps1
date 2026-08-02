@@ -18,19 +18,21 @@ $ExpectedManagedFiles = @(
     'THIRD-PARTY-NOTICES.md',
     'scripts/build.ps1',
     'scripts/one-click-publish.ps1',
+    'src/DisplayLift/AppSettings.cs',
     'src/DisplayLift/app.manifest',
     'src/DisplayLift/ColorEffectController.cs',
     'src/DisplayLift/ColorMatrixBuilder.cs',
     'src/DisplayLift/DisplayEffectEngine.cs',
     'src/DisplayLift/DisplayLift.csproj',
-    'src/DisplayLift/DisplayProfile.cs',
     'src/DisplayLift/ForegroundProcess.cs',
     'src/DisplayLift/GammaController.cs',
     'src/DisplayLift/MainForm.cs',
     'src/DisplayLift/NvidiaVibranceController.cs',
-    'src/DisplayLift/ProcessPickerDialog.cs',
-    'src/DisplayLift/ProfileStore.cs',
     'src/DisplayLift/Program.cs',
+    'src/DisplayLift/RustLocator.cs',
+    'src/DisplayLift/RustScene.cs',
+    'src/DisplayLift/ScreenSceneDetector.cs',
+    'src/DisplayLift/SettingsStore.cs',
     'src/DisplayLift/StartupManager.cs',
     'tests/DisplayLift.Tests/DisplayLift.Tests.csproj',
     'tests/DisplayLift.Tests/Program.cs',
@@ -53,12 +55,9 @@ function Add-Failure {
 }
 
 $Failures = New-Object 'System.Collections.Generic.List[string]'
-
 foreach ($relativePath in $ExpectedManagedFiles) {
     $nativePath = Join-Path $RepoRoot ($relativePath.Replace('/', '\'))
-    if (-not (Test-Path -LiteralPath $nativePath -PathType Leaf)) {
-        Add-Failure "Missing managed file: $relativePath"
-    }
+    if (-not (Test-Path -LiteralPath $nativePath -PathType Leaf)) { Add-Failure "Missing managed file: $relativePath" }
 }
 
 $ActualManagedFiles = New-Object 'System.Collections.Generic.List[string]'
@@ -86,13 +85,10 @@ $FilesForDuplicateNameScan = Get-ChildItem -LiteralPath $RepoRoot -File -Recurse
 }
 $CopyNamePattern = '(?i)(?:\s+-\s+copy|\s+copy|\s*\(\d+\))(?=\.[^./]+$|$)'
 foreach ($file in $FilesForDuplicateNameScan) {
-    if ($file.Name -match $CopyNamePattern) {
-        Add-Failure "Possible duplicate-copy filename detected: $(Convert-ToRepoPath $file.FullName)"
-    }
+    if ($file.Name -match $CopyNamePattern) { Add-Failure "Possible duplicate-copy filename detected: $(Convert-ToRepoPath $file.FullName)" }
 }
 
-$PathGroups = $ActualManagedFiles | Group-Object { $_.ToLowerInvariant() } | Where-Object { $_.Count -gt 1 }
-foreach ($group in $PathGroups) {
+foreach ($group in ($ActualManagedFiles | Group-Object { $_.ToLowerInvariant() } | Where-Object { $_.Count -gt 1 })) {
     Add-Failure "Case-colliding managed paths detected: $(($group.Group | Sort-Object) -join ', ')"
 }
 
@@ -133,9 +129,7 @@ if (($RequireClean -or $RequireRemoteSync) -and (Test-Path -LiteralPath (Join-Pa
 
         if ($RequireRemoteSync) {
             $RemoteNames = @(git remote)
-            if ($LASTEXITCODE -ne 0 -or 'origin' -notin $RemoteNames) {
-                Add-Failure "Git remote 'origin' is missing."
-            }
+            if ($LASTEXITCODE -ne 0 -or 'origin' -notin $RemoteNames) { Add-Failure "Git remote 'origin' is missing." }
             else {
                 git fetch --prune origin
                 if ($LASTEXITCODE -ne 0) { Add-Failure 'git fetch origin failed.' }
@@ -151,9 +145,7 @@ if (($RequireClean -or $RequireRemoteSync) -and (Test-Path -LiteralPath (Join-Pa
                             Add-Failure "Local $Branch and origin/$Branch are not synchronized (local/remote counts: $Counts)."
                         }
                         $Upstream = (git rev-parse --abbrev-ref --symbolic-full-name '@{u}').Trim()
-                        if ($LASTEXITCODE -ne 0 -or $Upstream -ne "origin/$Branch") {
-                            Add-Failure "Local branch $Branch is not tracking origin/$Branch."
-                        }
+                        if ($LASTEXITCODE -ne 0 -or $Upstream -ne "origin/$Branch") { Add-Failure "Local branch $Branch is not tracking origin/$Branch." }
                     }
                 }
             }

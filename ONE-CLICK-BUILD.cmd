@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title DisplayLift V7 Build
+cd /d "%~dp0"
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\build.ps1"
 if errorlevel 1 (
   echo.
@@ -9,5 +9,5 @@ if errorlevel 1 (
   exit /b 1
 )
 echo.
-echo Build finished successfully.
+echo Build completed successfully.
 pause

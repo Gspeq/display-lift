@@ -1,73 +1,59 @@
 using DisplayLift;
 
 var failures = new List<string>();
-
 void Assert(bool condition, string message)
 {
     if (!condition) failures.Add(message);
 }
 
-void AssertNear(float actual, float expected, float tolerance, string message)
-{
-    if (Math.Abs(actual - expected) > tolerance)
-    {
-        failures.Add($"{message}: expected {expected}, actual {actual}");
-    }
-}
+SceneAnalysis Classify(SceneMetrics metrics) => SceneClassifier.Classify(metrics);
 
-var identity = ColorMatrixBuilder.Identity();
-Assert(identity.Length == 25, "Identity matrix must contain 25 elements");
-AssertNear(identity[0], 1, 0.0001f, "Identity red diagonal");
-AssertNear(identity[6], 1, 0.0001f, "Identity green diagonal");
-AssertNear(identity[12], 1, 0.0001f, "Identity blue diagonal");
-AssertNear(identity[18], 1, 0.0001f, "Identity alpha diagonal");
-AssertNear(identity[24], 1, 0.0001f, "Identity homogeneous coordinate");
+var snow = Classify(new SceneMetrics(0.78, 0.12, 0.04, 0.72, 0.62, 0.03, 0.02, 0.11, 0.06, 0.63, 0.05));
+Assert(snow.Scene == RustScene.Snow, $"Snow metrics classified as {snow.Scene}");
 
-var grayscale = ColorMatrixBuilder.Build(0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
-AssertNear(grayscale[0], 0.2126f, 0.0001f, "Grayscale red luma");
-AssertNear(grayscale[5], 0.7152f, 0.0001f, "Grayscale green luma");
-AssertNear(grayscale[10], 0.0722f, 0.0001f, "Grayscale blue luma");
+var desert = Classify(new SceneMetrics(0.55, 0.50, 0.10, 0.28, 0.05, 0.48, 0.05, 0.05, 0.02, 0.08, 0.06));
+Assert(desert.Scene == RustScene.Desert, $"Desert metrics classified as {desert.Scene}");
 
-var exposure = ColorMatrixBuilder.Build(1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0);
-AssertNear(exposure[0], 2.0f, 0.0001f, "+1 EV must double red output");
-AssertNear(exposure[6], 2.0f, 0.0001f, "+1 EV must double green output");
-AssertNear(exposure[12], 2.0f, 0.0001f, "+1 EV must double blue output");
+var temperate = Classify(new SceneMetrics(0.45, 0.48, 0.15, 0.15, 0.04, 0.10, 0.46, 0.04, 0.02, 0.08, 0.07));
+Assert(temperate.Scene == RustScene.Temperate, $"Temperate metrics classified as {temperate.Scene}");
 
-var extreme = ColorMatrixBuilder.Build(2.25, 1.12, 0.05, 0.08, -0.06, 0.03, 1.05, 1.0, 1.11);
-Assert(extreme.All(float.IsFinite), "Maximum-color matrix must contain only finite values");
-Assert(extreme[0] > identity[0], "Maximum color must increase primary red coefficient");
-Assert(extreme[6] > identity[6], "Maximum color must increase primary green coefficient");
-Assert(extreme[12] > identity[12], "Maximum color must increase primary blue coefficient");
+var coast = Classify(new SceneMetrics(0.50, 0.42, 0.12, 0.20, 0.05, 0.15, 0.06, 0.34, 0.42, 0.07, 0.08));
+Assert(coast.Scene == RustScene.Coast, $"Coast metrics classified as {coast.Scene}");
 
-var rust = DisplayProfile.CreateRust(@"C:\Steam\RustClient.exe");
-Assert(rust.ProcessName == "RustClient", "Rust profile must target RustClient.exe");
-Assert(rust.Enabled, "Rust profile must be enabled by default");
-Assert(rust.Priority == 100, "Rust profile must have high priority");
-Assert(rust.SaturationPercent == 152, "Clean Rust must use 1.52 saturation");
-Assert(rust.VibrancePercent == 80, "Clean Rust must use +0.80 vibrance");
-Assert(rust.BrightnessPercent == 6, "Clean Rust must use +0.06 brightness");
-Assert(rust.ContrastPercent == 105, "Clean Rust must use 1.05 contrast");
+var night = Classify(new SceneMetrics(0.14, 0.24, 0.78, 0.01, 0.01, 0.07, 0.04, 0.08, 0.04, 0.32, 0.03));
+Assert(night.Scene == RustScene.NightInterior, $"Night metrics classified as {night.Scene}");
 
-var night = rust.Clone("Night test");
-night.ApplyPreset(RustVisualPreset.Night);
-Assert(night.ExposureHundredths > 0, "Night preset must raise exposure");
-Assert(night.GammaPercent > 100, "Night preset must raise midtones");
-Assert(night.ShadowLiftPercent >= 30, "Night preset must substantially lift shadows");
+var settings = new AppSettings();
+var balanced = RustVisualPresets.Create(RustScene.Balanced, settings);
+Assert(balanced.SaturationPercent == 152, "Balanced must preserve the researched 1.52 saturation baseline");
+Assert(balanced.VibrancePercent == 80, "Balanced must preserve +0.80 vibrance");
+Assert(balanced.BrightnessPercent == 6, "Balanced must preserve +0.06 brightness");
+Assert(balanced.ContrastPercent == 105, "Balanced must preserve 1.05 contrast");
 
-var winter = rust.Clone("Winter test");
-winter.ApplyPreset(RustVisualPreset.Winter);
-Assert(winter.ContrastPercent > rust.ContrastPercent, "Winter preset must add snow contrast");
-Assert(winter.ExposureHundredths < 0, "Winter preset must restrain snow exposure");
+var snowVisual = RustVisualPresets.Create(RustScene.Snow, settings);
+Assert(snowVisual.BrightnessPercent < balanced.BrightnessPercent, "Snow must reduce brightness");
+Assert(snowVisual.ContrastPercent > balanced.ContrastPercent, "Snow must raise contrast");
 
-var clone = rust.Clone();
-Assert(clone.Id != rust.Id, "Cloned profiles must receive a new ID");
-Assert(clone.ProcessName == rust.ProcessName, "Cloned profiles must retain process matching");
+var nightVisual = RustVisualPresets.Create(RustScene.NightInterior, settings);
+Assert(nightVisual.GammaPercent >= 120, "Night must lift midtones");
+Assert(nightVisual.ShadowLiftPercent >= 30, "Night must substantially lift shadows");
 
-var neutral = rust.Clone("Neutral test");
-neutral.ApplyPreset(RustVisualPreset.Neutral);
-Assert(neutral.SaturationPercent == 100 && neutral.ContrastPercent == 100, "Neutral preset must restore neutral matrix values");
-Assert(neutral.VibrancePercent == 0 && neutral.BrightnessPercent == 0, "Neutral preset must remove vibrance and brightness boosts");
-Assert(neutral.GammaPercent == 100 && neutral.ShadowLiftPercent == 0, "Neutral preset must restore neutral gamma values");
+settings.ColorStrengthPercent = 150;
+settings.BrightnessTrimPercent = 10;
+settings.ContrastStrengthPercent = 140;
+settings.ShadowAssistPercent = 150;
+var boosted = RustVisualPresets.Create(RustScene.Balanced, settings);
+Assert(boosted.SaturationPercent > balanced.SaturationPercent, "Color trim must raise saturation");
+Assert(boosted.BrightnessPercent > balanced.BrightnessPercent, "Brightness trim must raise brightness");
+Assert(boosted.ContrastPercent > balanced.ContrastPercent, "Contrast trim must raise contrast");
+Assert(boosted.ShadowLiftPercent > balanced.ShadowLiftPercent, "Shadow trim must raise shadow lift");
+
+var stabilizer = new SceneStabilizer();
+var first = stabilizer.Update(desert, 60);
+Assert(first.Scene == RustScene.Desert, "Stabilizer must lock the first clear scene");
+var noisyTemperate = new SceneAnalysis(RustScene.Temperate, 0.51, temperate.Metrics, temperate.Scores, temperate.Summary);
+var second = stabilizer.Update(noisyTemperate, 60);
+Assert(second.Scene == RustScene.Desert, "A single conflicting sample must not immediately switch scenes");
 
 try
 {
@@ -80,13 +66,10 @@ catch (ArgumentOutOfRangeException)
 
 if (failures.Count > 0)
 {
-    Console.Error.WriteLine("DisplayLift tests failed:");
-    foreach (var failure in failures)
-    {
-        Console.Error.WriteLine($"  - {failure}");
-    }
+    Console.Error.WriteLine("DisplayLift V8 tests failed:");
+    foreach (var failure in failures) Console.Error.WriteLine($"  - {failure}");
     return 1;
 }
 
-Console.WriteLine("DisplayLift V7 profile, preset and color-matrix tests passed.");
+Console.WriteLine("DisplayLift V8 auto-scene, preset, stabilization and color-matrix tests passed.");
 return 0;

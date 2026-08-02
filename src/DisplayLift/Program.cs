@@ -5,7 +5,7 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
-        using var instanceMutex = new Mutex(initiallyOwned: true, "Local\\DisplayLift.ProfileManager", out var createdNew);
+        using var instanceMutex = new Mutex(initiallyOwned: true, "Local\\DisplayLift.RustAutoScene.V8", out var createdNew);
         if (!createdNew)
         {
             MessageBox.Show("DisplayLift is already running. Check the system tray.", "DisplayLift", MessageBoxButtons.OK, MessageBoxIcon.Information);

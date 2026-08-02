@@ -2,12 +2,15 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>DisplayLift.Tests</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\src\DisplayLift\AppSettings.cs" Link="AppSettings.cs" />
+    <Compile Include="..\..\src\DisplayLift\RustScene.cs" Link="RustScene.cs" />
+    <Compile Include="..\..\src\DisplayLift\ScreenSceneDetector.cs" Link="ScreenSceneDetector.cs" />
     <Compile Include="..\..\src\DisplayLift\ColorMatrixBuilder.cs" Link="ColorMatrixBuilder.cs" />
-    <Compile Include="..\..\src\DisplayLift\DisplayProfile.cs" Link="DisplayProfile.cs" />
+    <Compile Include="..\..\src\DisplayLift\StartupManager.cs" Link="StartupManager.cs" />
   </ItemGroup>
 </Project>
