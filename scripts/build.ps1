@@ -61,6 +61,11 @@ if (-not (Test-Path $Exe)) {
     throw "Build completed without producing $Exe"
 }
 
+$BuiltExecutables = @(Get-ChildItem -LiteralPath $Dist -Filter 'DisplayLift*.exe' -File)
+if ($BuiltExecutables.Count -ne 1) {
+    throw "Expected exactly one DisplayLift executable in dist, but found $($BuiltExecutables.Count)."
+}
+
 $Zip = Join-Path $RepoRoot "DisplayLift-$Runtime.zip"
 if (Test-Path $Zip) {
     Remove-Item $Zip -Force

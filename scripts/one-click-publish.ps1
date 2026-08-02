@@ -1,3 +1,4 @@
+# DisplayLift-Publisher-Version: 4
 [CmdletBinding()]
 param(
     [string]$RepoName = 'display-lift',
@@ -7,6 +8,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
+
+if ($RepoName -notmatch '^[A-Za-z0-9._-]+$') {
+    throw 'RepoName may contain only letters, numbers, periods, underscores, and hyphens.'
+}
 
 function Refresh-Path {
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
@@ -37,60 +42,196 @@ function Ensure-WingetPackage {
     Refresh-Path
 }
 
+function Invoke-CapturedProcess {
+    param(
+        [Parameter(Mandatory)] [string]$FilePath,
+        [string[]]$ArgumentList = @()
+    )
+
+    $stdoutPath = [System.IO.Path]::GetTempFileName()
+    $stderrPath = [System.IO.Path]::GetTempFileName()
+    try {
+        $process = Start-Process `
+            -FilePath $FilePath `
+            -ArgumentList $ArgumentList `
+            -NoNewWindow `
+            -Wait `
+            -PassThru `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath
+
+        $stdout = if (Test-Path $stdoutPath) { Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue } else { '' }
+        $stderr = if (Test-Path $stderrPath) { Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue } else { '' }
+
+        return [PSCustomObject]@{
+            ExitCode = $process.ExitCode
+            StdOut = [string]$stdout
+            StdErr = [string]$stderr
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Assert-LastExitCode {
+    param([Parameter(Mandatory)] [string]$Message)
+    if ($LASTEXITCODE -ne 0) {
+        throw $Message
+    }
+}
+
 Ensure-WingetPackage -Command git -PackageId Git.Git -DisplayName 'Git'
 Ensure-WingetPackage -Command gh -PackageId GitHub.cli -DisplayName 'GitHub CLI'
 
 & (Join-Path $PSScriptRoot 'build.ps1')
+& (Join-Path $RepoRoot 'tests\Test-RepositoryState.ps1')
 
 Push-Location $RepoRoot
 try {
-    gh auth status *> $null
-    if ($LASTEXITCODE -ne 0) {
+    $AuthStatus = Invoke-CapturedProcess -FilePath 'gh' -ArgumentList @('auth', 'status')
+    if ($AuthStatus.ExitCode -ne 0) {
         Write-Host 'Sign in to GitHub in the browser window that opens.'
         gh auth login --web --git-protocol https
-        if ($LASTEXITCODE -ne 0) {
-            throw 'GitHub authentication failed.'
-        }
+        Assert-LastExitCode 'GitHub authentication failed.'
     }
 
-    $Login = (gh api user --jq '.login').Trim()
-    $UserId = (gh api user --jq '.id').Trim()
+    $LoginResult = Invoke-CapturedProcess -FilePath 'gh' -ArgumentList @('api', 'user', '--jq', '.login')
+    if ($LoginResult.ExitCode -ne 0) {
+        throw "Could not read the authenticated GitHub username. $($LoginResult.StdErr.Trim())"
+    }
+    $Login = $LoginResult.StdOut.Trim()
 
-    if (-not (Test-Path '.git')) {
+    $UserIdResult = Invoke-CapturedProcess -FilePath 'gh' -ArgumentList @('api', 'user', '--jq', '.id')
+    if ($UserIdResult.ExitCode -ne 0) {
+        throw "Could not read the authenticated GitHub user ID. $($UserIdResult.StdErr.Trim())"
+    }
+    $UserId = $UserIdResult.StdOut.Trim()
+
+    if (-not (Test-Path -LiteralPath '.git')) {
         git init -b main
+        Assert-LastExitCode 'git init failed.'
     }
 
-    if (-not (git config --local user.name)) {
+    git config --local core.autocrlf false
+    Assert-LastExitCode 'Could not configure repository line-ending behavior.'
+
+    $NameResult = Invoke-CapturedProcess -FilePath 'git' -ArgumentList @('config', '--local', '--get', 'user.name')
+    if ($NameResult.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($NameResult.StdOut)) {
         git config --local user.name $Login
+        Assert-LastExitCode 'Could not configure the local Git username.'
     }
-    if (-not (git config --local user.email)) {
+
+    $EmailResult = Invoke-CapturedProcess -FilePath 'git' -ArgumentList @('config', '--local', '--get', 'user.email')
+    if ($EmailResult.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($EmailResult.StdOut)) {
         git config --local user.email "$UserId+$Login@users.noreply.github.com"
+        Assert-LastExitCode 'Could not configure the local Git email.'
     }
 
-    git add .
-    git diff --cached --quiet
-    if ($LASTEXITCODE -ne 0) {
-        git commit -m 'Build DisplayLift Windows utility'
+    $BranchResult = Invoke-CapturedProcess -FilePath 'git' -ArgumentList @('branch', '--show-current')
+    $Branch = $BranchResult.StdOut.Trim()
+    if ([string]::IsNullOrWhiteSpace($Branch)) {
+        git switch -C main
+        Assert-LastExitCode 'Could not switch to the main branch.'
+        $Branch = 'main'
     }
 
-    $Remote = git remote get-url origin 2>$null
-    if (-not $Remote) {
-        $VisibilityFlag = if ($Visibility -eq 'private') { '--private' } else { '--public' }
-        gh repo create $RepoName $VisibilityFlag --source . --remote origin --push --description 'A small Windows display-gamma preset utility with safe restore controls.'
-        if ($LASTEXITCODE -ne 0) {
-            throw 'GitHub repository creation or initial push failed.'
-        }
+    git add -A -- .gitattributes .github .gitignore LICENSE ONE-CLICK-BUILD.cmd ONE-CLICK-PUBLISH.cmd README.md scripts src tests
+    Assert-LastExitCode 'git add failed.'
+
+    $StagedDiff = Invoke-CapturedProcess -FilePath 'git' -ArgumentList @('diff', '--cached', '--quiet')
+    if ($StagedDiff.ExitCode -eq 1) {
+        git commit -m 'Update DisplayLift Windows utility'
+        Assert-LastExitCode 'git commit failed.'
+    }
+    elseif ($StagedDiff.ExitCode -ne 0) {
+        throw "Could not inspect staged Git changes. $($StagedDiff.StdErr.Trim())"
     }
     else {
-        $Branch = (git branch --show-current).Trim()
-        git push -u origin $Branch
-        if ($LASTEXITCODE -ne 0) {
-            throw 'git push failed.'
-        }
+        Write-Host 'No source changes to commit; reusing the existing local commit.'
     }
 
+    & (Join-Path $RepoRoot 'tests\Test-RepositoryState.ps1') -RequireClean
+
+    $RemoteListResult = Invoke-CapturedProcess -FilePath 'git' -ArgumentList @('remote')
+    if ($RemoteListResult.ExitCode -ne 0) {
+        throw "Could not list Git remotes. $($RemoteListResult.StdErr.Trim())"
+    }
+    $RemoteNames = @($RemoteListResult.StdOut -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+
+    $FullRepo = "$Login/$RepoName"
+    $ExpectedHttpsUrl = "https://github.com/$FullRepo.git"
+
+    if ('origin' -notin $RemoteNames) {
+        $RepoView = Invoke-CapturedProcess -FilePath 'gh' -ArgumentList @('repo', 'view', $FullRepo, '--json', 'nameWithOwner', '--jq', '.nameWithOwner')
+        if ($RepoView.ExitCode -ne 0) {
+            $VisibilityFlag = "--$Visibility"
+            gh repo create $FullRepo $VisibilityFlag --description 'A small Windows display-gamma preset utility with safe restore controls.'
+            Assert-LastExitCode 'GitHub repository creation failed.'
+        }
+        else {
+            Write-Host "Using existing GitHub repository $FullRepo."
+        }
+
+        git remote add origin $ExpectedHttpsUrl
+        Assert-LastExitCode "Could not add Git remote 'origin'."
+    }
+
+    $OriginUrlResult = Invoke-CapturedProcess -FilePath 'git' -ArgumentList @('remote', 'get-url', 'origin')
+    if ($OriginUrlResult.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($OriginUrlResult.StdOut)) {
+        throw "Git remote 'origin' exists but has no usable URL."
+    }
+    $OriginUrl = $OriginUrlResult.StdOut.Trim()
+    $NormalizedOrigin = $OriginUrl.ToLowerInvariant().TrimEnd('/')
+    $AcceptedOrigins = @(
+        $ExpectedHttpsUrl.ToLowerInvariant().TrimEnd('/'),
+        "git@github.com:${FullRepo}.git".ToLowerInvariant(),
+        "ssh://git@github.com/${FullRepo}.git".ToLowerInvariant().TrimEnd('/')
+    )
+    if ($NormalizedOrigin -notin $AcceptedOrigins) {
+        throw "The existing origin remote points to '$OriginUrl', not '$FullRepo'. It was not changed automatically."
+    }
+    Write-Host "Origin remote: $OriginUrl"
+
+    git fetch --prune origin
+    Assert-LastExitCode 'git fetch origin failed.'
+
+    $RemoteRef = "refs/remotes/origin/$Branch"
+    $RemoteBranchResult = Invoke-CapturedProcess -FilePath 'git' -ArgumentList @('show-ref', '--verify', '--quiet', $RemoteRef)
+    if ($RemoteBranchResult.ExitCode -eq 0) {
+        $CountsResult = Invoke-CapturedProcess -FilePath 'git' -ArgumentList @('rev-list', '--left-right', '--count', "origin/$Branch...$Branch")
+        if ($CountsResult.ExitCode -ne 0) {
+            throw "Could not compare local and remote branches. $($CountsResult.StdErr.Trim())"
+        }
+
+        $Counts = @($CountsResult.StdOut.Trim() -split '\s+')
+        $RemoteOnly = [int]$Counts[0]
+        $LocalOnly = [int]$Counts[1]
+
+        if ($RemoteOnly -gt 0 -and $LocalOnly -gt 0) {
+            throw "Local $Branch and origin/$Branch have diverged. Nothing was force-pushed; reconcile the branches manually."
+        }
+
+        if ($RemoteOnly -gt 0 -and $LocalOnly -eq 0) {
+            git merge --ff-only "origin/$Branch"
+            Assert-LastExitCode "Could not fast-forward local $Branch from origin/$Branch."
+        }
+    }
+    elseif ($RemoteBranchResult.ExitCode -ne 1) {
+        throw "Could not inspect remote branch origin/$Branch. $($RemoteBranchResult.StdErr.Trim())"
+    }
+
+    git push -u origin $Branch
+    Assert-LastExitCode 'git push failed.'
+
+    & (Join-Path $RepoRoot 'tests\Test-RepositoryState.ps1') -RequireClean -RequireRemoteSync
+
+    $RemoteRepoResult = Invoke-CapturedProcess -FilePath 'gh' -ArgumentList @('repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner')
+    $RemoteRepo = if ($RemoteRepoResult.ExitCode -eq 0) { $RemoteRepoResult.StdOut.Trim() } else { $FullRepo }
+
     Write-Host ''
-    Write-Host "Published to GitHub as $Login/$RepoName" -ForegroundColor Green
+    Write-Host "Published and verified: $RemoteRepo" -ForegroundColor Green
+    Write-Host "Local HEAD and origin/$Branch are identical." -ForegroundColor Green
     gh repo view --web
 }
 finally {

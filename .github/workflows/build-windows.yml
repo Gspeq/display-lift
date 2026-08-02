@@ -17,9 +17,18 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - name: Verify repository structure
+        shell: pwsh
+        run: ./tests/Test-RepositoryState.ps1 -RequireClean
       - name: Publish single-file executable
         shell: pwsh
         run: ./scripts/build.ps1
+      - name: Verify build output
+        shell: pwsh
+        run: |
+          if (-not (Test-Path ./dist/DisplayLift.exe)) { throw 'DisplayLift.exe is missing.' }
+          $executables = @(Get-ChildItem ./dist -Filter DisplayLift*.exe -File)
+          if ($executables.Count -ne 1) { throw "Expected exactly one DisplayLift executable; found $($executables.Count)." }
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
